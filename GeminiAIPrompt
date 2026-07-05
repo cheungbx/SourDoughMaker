@@ -1,0 +1,64 @@
+You are an expert embedded systems engineer specializing in ESP8266 microcontrollers, physical automation using servo motors, and asynchronous web servers. Your task is to generate a complete, production-ready Arduino firmware (`.ino`) file for a Wi-Fi-enabled Sourdough Bread Machine Automation Engine.
+
+### 1. Hardware Architecture & Pin Mapping
+*   **Target MCU:** ESP8266 (NodeMCU/Wemos D1 Mini layout).
+*   **Peripherals:** 4 Servos or 4 Direct Digital Outputs mapping to existing hardware tactile buttons.
+*   **Hardware Toggle Switch:** `const bool ServoMode` determines operation behavior:
+    *   `true`: Servos attach to physical pins. A "Press" writes `90°` (active), delays, and reverts to `0°` (resting).
+    *   `false`: Pins are configured as standard digital outputs. Active state drops `LOW` (closed-circuit) and reverts `HIGH` (open-circuit).
+*   **Stable Pin Mapping:**
+    *   `MenuPin` = D1 (GPIO5)
+    *   `MinusPin` = D2 (GPIO4)
+    *   `RunResetPin` = D5 (GPIO14)
+    *   `ColourPin` = D6 (GPIO12)
+
+### 2. Third-Party Stack Mitigation & Compilation Standards
+*   **Include Order Dependency:** Core includes must declare first: `<Arduino.h>`, `<ESP8266WiFi.h>`, `<EEPROM.h>`, and `<Servo.h>`.
+*   **Legacy Library Overrides:** Explicitly define unsigned/signed aliases (`u8_t`, `u16_t`, `u32_t`, `s32_t`) globally to protect against core framework compilation breaks.
+*   **Compiler Warning Suppressions:** Wrap `#include <ESPAsyncTCP.h>` and `#include <ESPAsyncWebServer.h>` using GCC diagnostic pragmas to ignore `-Wunused-parameter` alerts natively stemming from the underlying stack.
+
+### 3. Architecture & Functional Parameters
+*   **Simulation / Test Flag:** Introduce `const bool testRun`. When `true`, time scaling steps down so `1 minute = 1 second` for rapid integration debugging. When `false`, structural clock cycles process at a real `1 minute = 60000ms` scale.
+*   **Engine States:** Implement an operational state machine using an enum: `WIFI_CONFIG_AP`, `MENU_SELECTION`, `KNEADING`, `DEGAS`, `HOTPROOF`, `PROOF`, `BAKE`, and `DONE`.
+*   **Bake Color Configuration:** Track color choices (`LIGHT = 0`, `MEDIUM = 1`, `DARK = 2`).
+*   **Time Parameters:** Configurable time blocks: Knead (minutes), Degas (minutes), HotProof (hours, float value), Proof (hours, float value), and Bake (minutes). Calculate and track total dynamic time remaining.
+
+### 4. Robust EEPROM Memory Footprint (128 Bytes allocated)
+*   **Address Space Allocations:**
+    *   `0`: Configuration Validity Marker (`0xAA`)
+    *   `1`: Knead Duration (Minutes)
+    *   `2`: Degas Duration (Minutes)
+    *   `3`: Proof Duration (stored as total minutes divided by 10)
+    *   `4`: Bake Duration (Minutes)
+    *   `5`: Bake Colour Selection Enum
+    *   `6`: Operation Mode State
+    *   `7`: Wi-Fi Validity Marker (`0xBB`)
+    *   `8-39`: Client Wi-Fi SSID String space (32 bytes max)
+    *   `40-103`: Client Wi-Fi Password String space (64 bytes max)
+    *   `104`: HotProof Duration (stored as total minutes divided by 10)
+
+### 5. Multi-Mode Wi-Fi Infrastructure & Exclusive IP Session Lock
+*   **Operation Modes:** Managed via an enum (`MODE_NONE`, `MODE_STANDALONE`, `MODE_WIFI`).
+    *   `MODE_STANDALONE`: Initializes a localized Soft-AP access point named `"SourDough"` (Password: `"12376254"`).
+    *   `MODE_WIFI`: Boots in Station mode (`WIFI_STA`) to connect to network credentials loaded out of EEPROM with a strict 60-second connection timeout threshold. If a timeout occurs, the system resets its structural mode back to `MODE_NONE` and reboots into a Captive Setup state.
+*   **Exclusive Session Guard:** Implement an IP security gate. The very first IP address that queries the index page (`/`) during a session locks the endpoint (`allowedClientIP`). Any secondary distinct IP addresses attempting network requests during active operations receive an HTTP `403 Access Denied` block.
+
+### 6. Dynamic Asynchronous Web Control Center (Port 80)
+*   **Captive Mode Web Page:** If engine state is `WIFI_CONFIG_AP`, render a standalone network onboarding portal with entry forms targeting SSID, Password, and target Operation Mode selection. Saves to EEPROM and restarts.
+*   **Production Controls Web Page:** If connected, present a responsive CSS dashboard that automatically polls/refreshes the system state every 3 seconds via native Javascript.
+    *   *Inputs:* Provide HTML select dropdown menus for color choices and recipe durations. Changing values invokes synchronous background query routes (`/set?k=30`, etc.) and triggers an auto-calculation update. Dropdowns must append `disabled` attributes once operations progress past `MENU_SELECTION`.
+    *   *Action Controls:* Provide intuitive paths for `/run`, `/pause` (resumes ongoing processes cleanly), and `/reset` (triggers immediate core hardware reset). Include a dual-confirmation safety button structure for clearing settings (`/erase_all`) and switching runtime modes (`/switch_mode`) to prevent accidental user clicks.
+
+### 7. Physical Automation Subroutines
+*   **Tactile Hardware Execution Logic:** Real-world control actions translate time blocks using mechanical cycles. The physical bread machine button mapping logic relies on pressing and holding the native buttons to clear its built-in memory states before signaling steps:
+    *   **Kneading Phase:** Long-press `RunResetPin` to clear memory. Short-press `MenuPin` 7 times, short-press `MinusPin` 10 times to adjust the built-in timer downward, then short-press `RunResetPin` to execute. Runs in maximum 30-minute block loop segments.
+    *   **Degas Phase:** Long-press `RunResetPin`. Short-press `MenuPin` 7 times, short-press `MinusPin` 9 times, then short-press `RunResetPin`. Runs in maximum 30-minute block loop segments.
+    *   **HotProof Phase:** Long-press `RunResetPin`. Invoke the **Bake Colour Signal Routine** (Short-press `ColourPin` 1 time for DARK, 2 times for LIGHT, 0 times for MEDIUM). Short-press `MenuPin` 9 times, short-press `MinusPin` 10 times, then short-press `RunResetPin`. Runs in maximum 60-minute block loop segments.
+    *   **Proof Phase:** Long-press `RunResetPin` to clear default tracking and sleep through the native cycle length.
+    *   **Bake Phase:** Long-press `RunResetPin`. Invoke the **Bake Colour Signal Routine**. Short-press `MenuPin` 13 times, short-press `MinusPin` 10 times, then short-press `RunResetPin`. Runs in maximum 60-minute block loop segments.
+
+### 8. Strict Logging Architecture & Layout Constraints
+*   **Debug Sanitization:** Enclose hardware logging profiles into categorical scopes governed by `DebugLevel` parameters (`DebugLevel >= 1` and `DebugLevel >= 2`).
+*   **Duplicate Loop Suppression:** Inside the asynchronous loop sequence, log changes utilizing comparative historical variables (`lastLoggedState`, `lastLoggedStep`, `lastLoggedLoop`). Suppress looping log readouts if indices do not change between clock increments.
+*   **Initial Boot Sign-Off Guard:** At the very start of the `if (DebugLevel >= 1)` conditional logic inside `setup()`, execute a dedicated for-loop block printing **exactly 10 lines** of the terminal separator `"=================================================="` out to the `Serial` interface before any other diagnostic text profiles print.
+
