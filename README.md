@@ -21,7 +21,7 @@ If OperationMode==WIFI, store the SSID and Password input by user  into EEPROM, 
 If OperationMode==Standalone, Restart the program from the very beginning.
 
 the Standalone-AP Process. 
-function as a WIFI AP with the SSID=”SourDough”, Password=”12376254”. Broadcast the SSID, 
+function as a WIFI AP with the SSID=”SourDough”+ the last six hexadecimal digits of the ESP8266, Password=”12376254”. Broadcast the SSID, 
 
 The WIFI-Connection Process.
 Connects to WIFI. If the WIFI connection fails after retrying for 1 minute,  logs the wifi connection error, erase the EEPROM WIFI configurations, and restart the program from the very beginning.
@@ -43,21 +43,18 @@ At the start of the program, If ServoMode = true, set up all 4 ServoMotors to tu
 
 Retrieve the  parameters default options from the EEPROM. If it does not exist, use the defaults as shown in the list of  parameters. Store the defaults  in the corresponding variable for later reference:
 BakeColour shown on web page as: “Bake Colour”  with  options Light Medium Dark  default Dark
-KneadMin shown on web page as: “Knead (min)”  with  options 15 30 45 60 90 default 30
-DegasMin  shown on web page as “Degas (min)” with options 15 30 45 60 90 120 150 180 default 30
+KneadMin shown on web page as: “Knead (min)”  with  options 0 15 30 45 60 90 default 30
+DegasMin  shown on web page as “Degas (min)” with options 0 15 30 45 60 90 120 150 180 default 30
 HotProofHr  shown on web page as “HotProof (hr)” with options  0 0.5 1 2 3 6 9 12 15 18 21 24  default 1 
 ProofHr  shown on web page as “Proof (hr)” with options  0 0.5 1 2 3 6 9 12 15 18 21 24  default 1 
-BakeMin shown on web page as “Bake (min)” with  options 10 20 30 40 50  60 70 80 90 100 110 120 default 60
+BakeMin shown on web page as “Bake (min)” with  options 0 10 20 30 40 50  60 70 80 90 100 110 120 default 60
 
 
 Create a home  page that accepts input any time this program is running as an Async Web Server. 
-Display the title “SourDough Maker” on the home page..
+Shows the title “Sourdough Maker”.
+If TestRun = true, add “ TEST”.
 Skip one line.
 Display the Status Line: “Select Options then press Run” and “ Total Time:” followed by RemainingMin in hh:mm format where hh is the hour, mm is the minute (see calculation for RemainingMin below).
-show  the “Erase Settings” button.
-If OperationMode == standalone , show the “Switch to WIFI” button.
-If OperationMode == WIFI, show the “Switch to Standalone” button.
-
 
 Display a line separator.
 Then display a menu screen  that shows the  parameters above with options to be chosen.
@@ -71,6 +68,11 @@ Skip one line.
 Show a Run button.
 Skip one line.
 Show the Restart  button.
+skip one line.
+                                                                                                                                                                                      
+show  the “Erase Settings” button.
+If OperationMode == standalone , show the “Switch to WIFI” button.
+If OperationMode == WIFI, show the “Switch to Standalone” button.
 
 when the “Erase  Settings” button is pressed, replace it with the “Confirm to Erase Settings” button.
 When the “Confirm to Erase settings” button is pressed, erase all EEPROM configurations stored, restart the program.
@@ -81,7 +83,7 @@ when the “Switch to Standalone”  button is pressed, replace it with the “C
 When the “Confirm to Switch to WIFI” button is pressed, set  the OperationMode in EEPROM to WIFI, then restart the program.
 When the “Confirm to Switch to Standalone” button is pressed, set the OperationMode in EEPROM to Standalone, then restart the program.
 
-When the Restart button is pressed, display “System Rebooting…”, then reboot and re-initiate from the very beginning.  
+When the Restart button is pressed, display on the status line  “System Rebooting…” in RED, pause for 2 seconds then restart the program..  
  
 When the Run button is pressed, start the SourDough Process.
 
@@ -95,10 +97,12 @@ Count down the time remaining using RemainingMin.
 When the Pause button is pressed and the SourDough process is running, display “Pausing:” on the status line, then pause the SourDough process, and pause the TotalMin count down.
 When the Pause button is pressed and the SourDough process is pausing, display “Running”, then continue the SourDough process, and continue  the TotalMin count down.
 
-When the Restart button is pressed, reboot and re-initiate from the very beginning.  
+When the Restart button is pressed, replace it with the “Confirm to Restart” button.
+When the “Confirm to Restart”  button is pressed, restart the program.
 
 
-Runs the following processes in sequence : The Kneading Process then the Degas Process, then the HotProof Process, then the Proof Process then the Bake Process then returns to the Menu-Selection Process.
+
+Runs the following processes in sequence : The Knead Process then the Degas Process, then the HotProof Process, then the Proof Process then the Bake Process then returns to the Menu-Selection Process. When running a processes above , if the Option for that process is zero, logs that that process is skipped, and proceed to the next process. e.g. if the KneadMin is zero, logs “Skipping the Knead Process”, and proceed to the Degas process.
 At the start of each process, highlight the line for that process on the  home page. E.g. When the Kneading Process starts, highlight the line for “KneadMin”.
 
 Any time during these processes, continue to display the RemainingMin in hh:mm format where hh is the hour, mm is the minute, and display a spinning sequence indicator (/, -, \, |) next to the RemainingMin  to show that the SourDough Process is currently running. Any time during the SourDough Process, continue to accept input on the Reset Button and the  Pause button on the  home page. Ignore any other input from the  home page.
@@ -110,10 +114,11 @@ If ServoMode is false, turn the Pin LOW and pause for 0.2 second, then turn the 
 If ServoMode is true, move the servo motor to 90 degree, pause for 0.2 second, then move back to 0 degree and pause for 0.3 seconds.
 
 The LongPress process.
-The Long Press process  takes two inputs: Pin and Number of Times (defaults to 1).
+The Long Press process  takes one  input: Pin.
 Logs the current RemainingMin in hh:mm format, followed by “LongPress “ with the Pin name and the Number of Times. For each  Number of Times:
-If ServoMode is false, turn the Pin LOW and pause for 2 seconds, then turn the pin HIGH and pause for 1 second.
-If ServoMode is true, move the servo motor to 90 degree, pause for 2 seconds, then move back to 0 degree and pause for 1 second.
+If ServoMode is false,  turn the Pin LOW and pause for 0.2 second, then turn the pin HIGH and pause for 0.3 seconds  then turn the Pin LOW and pause for 3 seconds, then turn the pin HIGH and pause for 1 second.
+If ServoMode is true, move the servo motor to 90 degree, pause for 0.2 second, then move back to 0 degree and pause for 0.3 seconds.
+, then move the servo motor to 90 degree, pause for 3 seconds, then move back to 0 degree and pause for 1 second.
 
 The Knead Process
 Set cycleMin to 30.
@@ -142,8 +147,8 @@ The HotProof Process
 Set cycleMin to 60.
 Divide HotProofMin by cycleMin  and store the quotient as NoOfLoop, store  the remainder as FinalMin.
 Logs the CycleMin, NoOfLoop, FinalMin as debug messages with the RemainingMin as header.
-For each NoOfLoop, Logs the LoopCounter and CycleMin as debug messages with the RemainingMin as header, longPresss the RunResetPin,  then call the BakeColour process, then  ShortPresss the MenuPin  9 times. then shortPresss the MinusPin 10 times, then shortPresss the RunResetPin 1 time, pause for CycleMin
-If FinalMin > 0, Logs the FinalMin  as debug messages with the RemainingMin as header,  longPresss the RunResetPin,  then call the BakeColour process, then  ShortPresss the MenuPin  9 times. then shortPresss the MinusPin 10 times, then shortPresss the RunResetPin, pause for FinalMin minutes
+For each NoOfLoop, Logs the LoopCounter and CycleMin as debug messages with the RemainingMin as header, longPresss the RunResetPin,  then  ShortPresss the MenuPin  9 times. then shortPresss the MinusPin 10 times, then shortPresss the RunResetPin 1 time, pause for CycleMin
+If FinalMin > 0, Logs the FinalMin  as debug messages with the RemainingMin as header,  longPresss the RunResetPin,  then  ShortPresss the MenuPin  9 times. then shortPresss the MinusPin 10 times, then shortPresss the RunResetPin, pause for FinalMin minutes
 
 
 The Bake Process
