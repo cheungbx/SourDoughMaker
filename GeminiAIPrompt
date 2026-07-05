@@ -39,7 +39,7 @@ You are an expert embedded systems engineer specializing in ESP8266 microcontrol
 
 ### 5. Multi-Mode Wi-Fi Infrastructure & Exclusive IP Session Lock
 *   **Operation Modes:** Managed via an enum (`MODE_NONE`, `MODE_STANDALONE`, `MODE_WIFI`).
-    *   `MODE_STANDALONE`: Initializes a localized Soft-AP access point named `"SourDough"` (Password: `"12376254"`).
+    *   `MODE_STANDALONE`: Initializes a localized Soft-AP access point broadcasting its SSID publicly. The SSID must be dynamically computed as `"SourDough"` concatenated with the last six hexadecimal digits of the ESP8266 chip's unique ID/MAC address (e.g., `WiFi.macAddress()` parsed or `ESP.getChipId()`). The access point security key is statically defined as `"12376254"`.
     *   `MODE_WIFI`: Boots in Station mode (`WIFI_STA`) to connect to network credentials loaded out of EEPROM with a strict 60-second connection timeout threshold. If a timeout occurs, the system resets its structural mode back to `MODE_NONE` and reboots into a Captive Setup state.
 *   **Exclusive Session Guard:** Implement an IP security gate. The very first IP address that queries the index page (`/`) during a session locks the endpoint (`allowedClientIP`). Any secondary distinct IP addresses attempting network requests during active operations receive an HTTP `403 Access Denied` block.
 
@@ -61,4 +61,3 @@ You are an expert embedded systems engineer specializing in ESP8266 microcontrol
 *   **Debug Sanitization:** Enclose hardware logging profiles into categorical scopes governed by `DebugLevel` parameters (`DebugLevel >= 1` and `DebugLevel >= 2`).
 *   **Duplicate Loop Suppression:** Inside the asynchronous loop sequence, log changes utilizing comparative historical variables (`lastLoggedState`, `lastLoggedStep`, `lastLoggedLoop`). Suppress looping log readouts if indices do not change between clock increments.
 *   **Initial Boot Sign-Off Guard:** At the very start of the `if (DebugLevel >= 1)` conditional logic inside `setup()`, execute a dedicated for-loop block printing **exactly 10 lines** of the terminal separator `"=================================================="` out to the `Serial` interface before any other diagnostic text profiles print.
-
