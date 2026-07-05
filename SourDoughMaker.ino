@@ -215,23 +215,40 @@ void shortPress(int pin, int numberOfTimes) {
 }
 
 void longPress(int pin, int numberOfTimes) {
-  if (DebugLevel >= 2) {
-    Serial.print("["); Serial.print(getFormattedTime(remainingMin)); 
-    Serial.print("] LongPress -> "); Serial.print(getPinName(pin));
-    Serial.print(" "); Serial.println(numberOfTimes);
+  if (DebugLevel >= 1) {
+    Serial.print("["); 
+    Serial.print(getFormattedTime(remainingMin)); 
+    Serial.print("] LongPress -> "); 
+    Serial.print(getPinName(pin));
+    Serial.print(" "); 
+    Serial.println(numberOfTimes);
   }
 
   for (int i = 0; i < numberOfTimes; i++) {
     if (!ServoMode) {
+      // Step 1: Initial Pulse (0.2s LOW / 0.3s HIGH)
       digitalWrite(pin, LOW);
-      delay(2000);
+      delay(200);
+      digitalWrite(pin, HIGH);
+      delay(300);
+      
+      // Step 2: Main Sustained Hold (3s LOW / 1s HIGH)
+      digitalWrite(pin, LOW);
+      delay(3000);
       digitalWrite(pin, HIGH);
       delay(1000);
     } else {
       Servo* targetServo = getServoByPin(pin);
       if (targetServo != nullptr) {
+        // Step 1: Initial Servo Swipe (90° for 0.2s / 0° for 0.3s)
         targetServo->write(90);
-        delay(2000);
+        delay(200);
+        targetServo->write(0);
+        delay(300);
+        
+        // Step 2: Main Sustained Servo Hold (90° for 3s / 0° for 1s)
+        targetServo->write(90);
+        delay(3000);
         targetServo->write(0);
         delay(1000);
       }
@@ -407,6 +424,7 @@ String generateHtml() {
   html += "button { background-color: #4CAF50; color: white; border: none; cursor: pointer; border-radius: 4px;}";
   html += "button.pause { background-color: #ff9800; }";
   html += "button.reset { background-color: #f44336; }";
+  html += "button.reset-confirm { background-color: #b71c1c; font-weight: bold; }"; // Styling for confirmation state
   html += "button.erase-init { background-color: #757575; font-size: 13px; padding: 6px 12px; margin: 5px auto; display: block; }";
   html += "button.erase-confirm { background-color: #d32f2f; font-size: 13px; padding: 6px 12px; font-weight: bold; margin: 5px auto; display: none; }";
   html += "button.switch-init { background-color: #0288d1; font-size: 13px; padding: 6px 12px; margin: 5px auto; display: block; }";
@@ -428,26 +446,15 @@ String generateHtml() {
   html += "  document.getElementById('switchStandaloneInitBtn').style.display = 'none';";
   html += "  document.getElementById('switchStandaloneConfirmBtn').style.display = 'block';";
   html += "}";
+  // Added helper function for the two-step restart confirmation
+  html += "function exposeRestartConfirmButton() {";
+  html += "  document.getElementById('restartInitBtn').style.display = 'none';";
+  html += "  document.getElementById('restartConfirmBtn').style.display = 'inline-block';";
+  html += "}";
   html += "</script>";
   html += "</head><body><div class='card'>";
-  html += "<h2>SourDough Maker " + String(testRun ? "(TEST MODE)" : "") + "</h2>";
-
-  if (currentState == MENU_SELECTION) {
-    html += "<div style='padding: 5px 0;'>";
-    html += "  <button id='eraseInitBtn' class='erase-init' onclick='exposeConfirmButton()'>Erase Settings</button>";
-    html += "  <button id='eraseConfirmBtn' class='erase-confirm' onclick='location.href=\"/erase_all\"'>Confirm to Erase Settings</button>";
-    
-    if (operationMode == MODE_STANDALONE) {
-      html += "  <button id='switchWifiInitBtn' class='switch-init' onclick='exposeWifiConfirmButton()'>Switch to WIFI</button>";
-      html += "  <button id='switchWifiConfirmBtn' class='switch-confirm' onclick='location.href=\"/switch_mode?to=wifi\"'>Confirm to switch to WIFI</button>";
-    } else if (operationMode == MODE_WIFI) {
-      html += "  <button id='switchStandaloneInitBtn' class='switch-init' onclick='exposeStandaloneConfirmButton()'>Switch to Standalone</button>";
-      html += "  <button id='switchStandaloneConfirmBtn' class='switch-confirm' onclick='location.href=\"/switch_mode?to=standalone\"'>Confirm to switch to Standalone</button>";
-    }
-    
-    html += "</div>";
-    html += "<hr>";
-  }
+  
+  html += "<h2>SourDough Maker " + String(testRun ? "TEST" : "") + "</h2>";
 
   html += "<p style='margin-top: 12px;'><strong>Status: </strong>";
   if (currentState == MENU_SELECTION) {
@@ -466,7 +473,6 @@ String generateHtml() {
   }
   html += "</p><hr>";
 
-  // Locks down options entirely when process leaves MENU_SELECTION state
   String disabledAttr = (currentState != MENU_SELECTION) ? "disabled" : "";
   
   html += "<div>";
@@ -529,14 +535,32 @@ String generateHtml() {
   }
   html += "</select></div><br>"; 
 
-  // Completely dynamic swap behavior of homepage buttons based on runtime execution
   if (currentState == MENU_SELECTION) {
     html += "<button onclick='location.href=\"/run\"'>Run</button><br>";
   } else if (currentState != DONE) {
     html += "<button class='pause' onclick='location.href=\"/pause\"'>" + String(isPaused ? "Resume" : "Pause") + "</button><br>";
   }
   
-  html += "<button class='reset' onclick='location.href=\"/reset\"'>Restart</button>";
+  // Two-step confirmation logic block applied here
+  html += "<button id='restartInitBtn' class='reset' onclick='exposeRestartConfirmButton()'>Restart</button>";
+  html += "<button id='restartConfirmBtn' class='reset reset-confirm' style='display:none;' onclick='location.href=\"/reset\"'>Confirm to Restart</button>";
+
+  if (currentState == MENU_SELECTION) {
+    html += "<hr>";
+    html += "<div style='padding: 5px 0;'>";
+    html += "  <button id='eraseInitBtn' class='erase-init' onclick='exposeConfirmButton()'>Erase Settings</button>";
+    html += "  <button id='eraseConfirmBtn' class='erase-confirm' onclick='location.href=\"/erase_all\"'>Confirm to Erase Settings</button>";
+    
+    if (operationMode == MODE_STANDALONE) {
+      html += "  <button id='switchWifiInitBtn' class='switch-init' onclick='exposeWifiConfirmButton()'>Switch to WIFI</button>";
+      html += "  <button id='switchWifiConfirmBtn' class='switch-confirm' onclick='location.href=\"/switch_mode?to=wifi\"'>Confirm to switch to WIFI</button>";
+    } else if (operationMode == MODE_WIFI) {
+      html += "  <button id='switchStandaloneInitBtn' class='switch-init' onclick='exposeStandaloneConfirmButton()'>Switch to Standalone</button>";
+      html += "  <button id='switchStandaloneConfirmBtn' class='switch-confirm' onclick='location.href=\"/switch_mode?to=standalone\"'>Confirm to switch to Standalone</button>";
+    }
+    html += "</div>";
+  }
+
   html += "</div></body></html>";
   return html;
 }
@@ -711,7 +735,7 @@ void setup() {
   server.on("/reset", HTTP_GET, [](AsyncWebServerRequest *request){
     if (!isAuthorizedClient(request)) return;
     triggerReset = true; 
-    request->redirect("/");
+    request->send(200, "text/plain", "Device is restarting now...");
   });
 
   server.begin();
@@ -833,7 +857,6 @@ void loop() {
 
   if (triggerReset) {
     triggerReset = false;
-    delay(500); 
     ESP.restart(); 
   }
 
