@@ -23,10 +23,10 @@ const bool ServoMode = true;      // Set to true to use Servo Motors, false for 
 const int DebugLevel = 2; 
 
 // --- Stable Pin Assignments ---
-const int MenuPin     = D1; // GPIO5 (Stable)
-const int MinusPin    = D2; // GPIO4 (Stable)
-const int RunResetPin = D5; // GPIO14 (Stable)
-const int ColourPin   = D6; // GPIO12 (Stable)
+const int MenuPin     = D1; // GPIO5
+const int MinusPin    = D2; // GPIO4
+const int RunResetPin = D5; // GPIO14
+const int ColourPin   = D6; // GPIO12
 
 // --- Servo Instances ---
 Servo MenuServo;
@@ -34,9 +34,9 @@ Servo MinusServo;
 Servo RunResetServo;
 Servo ColourServo;
 
-// --- AP Default Fallback Credentials ---
-const char* defaultSsid = "SourDough";
+// --- AP Default Fallback Configuration ---
 const char* defaultPassword = "12376254"; 
+String apSsid = "SourDough"; // Will dynamically append chip signature on initialization
 
 // Dynamic Network Strings populated out of EEPROM storage
 String clientSsid = "";
@@ -61,7 +61,7 @@ OpModeOption operationMode = MODE_WIFI;
 bool isPaused = false;
 unsigned long previousMillis = 0;
 
-// Parameter Options and Defaults
+// Parameter Options and Defaults (Matching User Specifications Exactly)
 int kneadMin = 30;
 int degasMin = 30;
 float hotProofHr = 1.0;
@@ -96,7 +96,7 @@ const int ADDR_OP_MODE      = 6;
 const int ADDR_WIFI_MARKER  = 7;  
 const int ADDR_WIFI_SSID    = 8;   
 const int ADDR_WIFI_PASS    = 40;  
-const int ADDR_HOTPROOF     = 104; // Reserved non-overlapping address slot
+const int ADDR_HOTPROOF     = 104; 
 
 const uint8_t VALID_CONFIG_MAGIC = 0xAA; 
 const uint8_t VALID_WIFI_MAGIC   = 0xBB;
@@ -119,6 +119,7 @@ String getPinName(int pin);
 Servo* getServoByPin(int pin);
 void shortPress(int pin, int numberOfTimes = 1);
 void longPress(int pin, int numberOfTimes = 1);
+void moveToNextValidState();
 
 // --- Helper UI functions ---
 void calculateRemainingTime() {
@@ -149,6 +150,12 @@ String getBakeColourName(BakeColourOption opt) {
   return "Dark";
 }
 
+String getOpModeName(OpModeOption opt) {
+  if (opt == MODE_STANDALONE) return "STANDALONE (Access Point)";
+  if (opt == MODE_WIFI) return "WIFI (Client Station)";
+  return "NONE / UNCONFIGURED";
+}
+
 String getStateName(EngineState state) {
   switch (state) {
     case WIFI_CONFIG_AP: return "WIFI_CONFIG_AP";
@@ -163,13 +170,22 @@ String getStateName(EngineState state) {
   return "UNKNOWN";
 }
 
-// Helper to interact with the right servo instance based on the Pin ID
 Servo* getServoByPin(int pin) {
   if (pin == MenuPin) return &MenuServo;
   if (pin == MinusPin) return &MinusServo;
   if (pin == RunResetPin) return &RunResetServo;
   if (pin == ColourPin) return &ColourServo;
   return nullptr;
+}
+
+void computeDynamicAPProperties() {
+  String mac = WiFi.macAddress();
+  mac.replace(":", "");
+  if (mac.length() >= 6) {
+    apSsid += mac.substring(mac.length() - 6);
+  } else {
+    apSsid += "XXXXXX";
+  }
 }
 
 // --- Dynamic Pin Press Actions ---
@@ -223,7 +239,6 @@ void longPress(int pin, int numberOfTimes) {
   }
 }
 
-// --- Bake Colour Signal Routine ---
 void executeBakeColourSequence() {
   if (DebugLevel >= 1) {
     Serial.print("["); Serial.print(getFormattedTime(remainingMin)); 
@@ -307,22 +322,12 @@ void saveWifiToEEPROM(String ssidStr, String passStr) {
   EEPROM.commit();
 }
 
-void eraseWifiConfig() {
-  EEPROM.write(ADDR_WIFI_MARKER, 0); 
-  EEPROM.commit();
-}
-
 void eraseAllEEPROM() {
   EEPROM.begin(EEPROM_SIZE);
   for (int i = 0; i < EEPROM_SIZE; i++) {
     EEPROM.write(i, 0);
   }
   EEPROM.commit();
-}
-
-bool hasWifiConfigInEEPROM() {
-  EEPROM.begin(EEPROM_SIZE);
-  return (EEPROM.read(ADDR_WIFI_MARKER) == VALID_WIFI_MAGIC);
 }
 
 void loadWifiFromEEPROM() {
@@ -342,10 +347,9 @@ void loadWifiFromEEPROM() {
   }
 }
 
-// --- Process Logic Encapsulations ---
 void executeStandaloneAPProcess() {
   WiFi.mode(WIFI_AP);
-  WiFi.softAP(defaultSsid, defaultPassword);
+  WiFi.softAP(apSsid.c_str(), defaultPassword);
 }
 
 bool executeWifiConnectionProcess() {
@@ -411,7 +415,7 @@ String generateHtml() {
   html += "</style>";
   
   html += "<script>";
-  html += "setInterval(function() { if(!" + String(isPaused) + " || " + String(currentState == MENU_SELECTION) + ") { window.location.reload(); } }, 3000);";
+  html += "setInterval(function() { window.location.reload(); }, 3000);";
   html += "function exposeConfirmButton() {";
   html += "  document.getElementById('eraseInitBtn').style.display = 'none';";
   html += "  document.getElementById('eraseConfirmBtn').style.display = 'block';";
@@ -451,7 +455,7 @@ String generateHtml() {
   } else if (currentState == DONE) {
     html += "Sourdough Done";
   } else if (isPaused) {
-    html += "Pausing";
+    html += "Pausing:";
   } else {
     html += "Running";
   }
@@ -462,6 +466,7 @@ String generateHtml() {
   }
   html += "</p><hr>";
 
+  // Locks down options entirely when process leaves MENU_SELECTION state
   String disabledAttr = (currentState != MENU_SELECTION) ? "disabled" : "";
   
   html += "<div>";
@@ -475,8 +480,8 @@ String generateHtml() {
   html += "<div class='" + String(currentState == KNEADING ? "highlight" : "") + "'>";
   html += "<label>Knead (min): </label>";
   html += "<select name='knead' " + disabledAttr + " onchange='location.href=\"/set?k=\"+this.value'>";
-  int kneadOptions[] = {15, 30, 45, 60, 90};
-  for (int i = 0; i < 5; i++) {
+  int kneadOptions[] = {0, 15, 30, 45, 60, 90};
+  for (int i = 0; i < 6; i++) {
     int m = kneadOptions[i];
     html += "<option value='" + String(m) + "' " + (kneadMin == m ? "selected" : "") + ">" + String(m) + "</option>";
   }
@@ -485,8 +490,8 @@ String generateHtml() {
   html += "<div class='" + String(currentState == DEGAS ? "highlight" : "") + "'>";
   html += "<label>Degas (min): </label>";
   html += "<select name='degas' " + disabledAttr + " onchange='location.href=\"/set?d=\"+this.value'>";
-  int degasOptions[] = {15, 30, 45, 60, 90, 120, 150, 180};
-  for (int i = 0; i < 8; i++) {
+  int degasOptions[] = {0, 15, 30, 45, 60, 90, 120, 150, 180};
+  for (int i = 0; i < 9; i++) {
     int m = degasOptions[i];
     html += "<option value='" + String(m) + "' " + (degasMin == m ? "selected" : "") + ">" + String(m) + "</option>";
   }
@@ -517,18 +522,17 @@ String generateHtml() {
   html += "<div class='" + String(currentState == BAKE ? "highlight" : "") + "'>";
   html += "<label>Bake (min): </label>";
   html += "<select name='bake' " + disabledAttr + " onchange='location.href=\"/set?b=\"+this.value'>";
-  int bakeOptions[] = {10, 20, 30, 40, 50, 60, 70, 80, 90, 100, 110, 120};
-  for (int i = 0; i < 12; i++) {
+  int bakeOptions[] = {0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100, 110, 120};
+  for (int i = 0; i < 13; i++) {
     int m = bakeOptions[i];
     html += "<option value='" + String(m) + "' " + (bakeMin == m ? "selected" : "") + ">" + String(m) + "</option>";
   }
   html += "</select></div><br>"; 
 
+  // Completely dynamic swap behavior of homepage buttons based on runtime execution
   if (currentState == MENU_SELECTION) {
     html += "<button onclick='location.href=\"/run\"'>Run</button><br>";
-  } 
-  
-  if (currentState != MENU_SELECTION && currentState != DONE) {
+  } else if (currentState != DONE) {
     html += "<button class='pause' onclick='location.href=\"/pause\"'>" + String(isPaused ? "Resume" : "Pause") + "</button><br>";
   }
   
@@ -573,9 +577,11 @@ void setup() {
     digitalWrite(ColourPin, HIGH); 
   }
 
+  // Configurations loaded automatically from memory storage on start
   loadSettingsFromEEPROM();
   calculateRemainingTime();
 
+  computeDynamicAPProperties();
   loadWifiFromEEPROM();
   OpModeOption storedMode = loadOpModeFromEEPROM();
 
@@ -684,6 +690,20 @@ void setup() {
     if (!isAuthorizedClient(request)) return;
     if (currentState != MENU_SELECTION && currentState != DONE && currentState != WIFI_CONFIG_AP) {
       isPaused = !isPaused;
+      
+      // Pause/resume execution mechanics
+      if (isPaused) {
+        stepTimer = millis() - stepTimer; 
+        if (DebugLevel >= 1) {
+          Serial.println("[SYSTEM] Process status: Paused");
+        }
+      } else {
+        stepTimer = millis() - stepTimer;
+        previousMillis = millis(); 
+        if (DebugLevel >= 1) {
+          Serial.println("[SYSTEM] Process status: Running");
+        }
+      }
     }
     request->redirect("/");
   });
@@ -696,47 +716,77 @@ void setup() {
 
   server.begin();
 
-  // --- Consolidated Setup Debug Logs (Only triggered if DebugLevel >= 1) ---
+  // --- UNIFIED PROGRAM START COLD LOGGING ---
   if (DebugLevel >= 1) {
-    // Exactly 10 lines of separators log prior to system text profiles
-    for (int i = 0; i < 10; i++) {
-      Serial.println("==================================================");
+    for (int i = 0; i < 5; i++) Serial.println("==================================================");
+    Serial.println("\n--- SYSTEM BOOT ---");
+    Serial.printf("[CONFIG] ServoMode status: %s\n", ServoMode ? "ENABLED" : "DISABLED");
+    Serial.printf("[CONFIG] testRun status  : %s\n", testRun ? "ENABLED (1s=1m)" : "DISABLED");
+
+    if (operationMode == MODE_WIFI && WiFi.status() == WL_CONNECTED) {
+      Serial.printf("[SYSTEM] Connected Node IP: %s\n", WiFi.localIP().toString().c_str());
+    } else {
+      Serial.printf("[SYSTEM] Broadcast SSID: %s\n", apSsid.c_str());
     }
     
-    Serial.println("\n--- SYSTEM BOOT ---");
-    Serial.print("[CONFIG] ServoMode status: "); Serial.println(ServoMode ? "ENABLED (True)" : "DISABLED (False)");
-    Serial.print("[CONFIG] testRun status  : "); Serial.println(testRun ? "ENABLED (True)" : "DISABLED (False)");
-    Serial.print("[CONFIG] DebugLevel level: "); Serial.println(DebugLevel);
+    Serial.printf("[SYSTEM] Active Wi-Fi Mode: %s\n", getOpModeName(operationMode).c_str());
+  }
+}
 
-    if (ServoMode) {
-      Serial.println("[HARDWARE] Servos initialized and anchored to 0 degrees.");
-    } else {
-      Serial.println("[HARDWARE] Digital Pins configured and pulled HIGH.");
+// --- Global sequence logic engine dealing with automated skips & logging updates ---
+void moveToNextValidState() {
+  breadStateStep = 0;
+  loopCounter = 0;
+  stepActive = false;
+
+  if (currentState == KNEADING) {
+    currentState = DEGAS;
+    if (degasMin == 0) {
+      Serial.println("Skipping the Degas Process");
+      moveToNextValidState();
+    } else if (DebugLevel >= 1) {
+      int cycleMin = 30;
+      int NoOfLoop = degasMin / cycleMin;
+      int finalMin = degasMin % cycleMin;
+      Serial.printf("Starting Process: DEGAS | cycleMin: %d | NoOfLoop: %d | finalMin: %d\n", cycleMin, NoOfLoop, finalMin);
     }
-
-    if (operationMode == MODE_STANDALONE || storedMode == MODE_STANDALONE) {
-      Serial.println("[SYSTEM] Standalone-AP Process Initiated.");
-      Serial.print("[SYSTEM] Broadcast SSID: "); Serial.println(defaultSsid);
-      Serial.print("[SYSTEM] Network Active Gateway IP: "); Serial.println(WiFi.softAPIP());
-    } 
-    else if (operationMode == MODE_WIFI) {
-      Serial.print("[SYSTEM] WIFI-Connection Process Commenced. Attempting access point connection to: "); 
-      Serial.println(clientSsid);
-      if (WiFi.status() == WL_CONNECTED) {
-        Serial.print("[SYSTEM] Wi-Fi Connection Established Successfully! Assigned local node IP: "); 
-        Serial.println(WiFi.localIP());
-      } else {
-        Serial.println("\n[SYSTEM] ERROR: Wi-Fi Connection failed after 1 minute timeline threshold.");
-        Serial.println("[SYSTEM] Erasing local EEPROM OperationMode profile and forcing reboot...");
-      }
+ } else if (currentState == DEGAS) {
+    currentState = HOTPROOF;
+    if (hotProofHr == 0.0) {
+      Serial.println("Skipping the HotProof Process");
+      moveToNextValidState();
+    } else if (DebugLevel >= 1) {
+      int cycleMin = 60;
+      int hotProofMin = (int)(hotProofHr * 60.0 + 0.5); 
+      int NoOfLoop = hotProofMin / cycleMin;
+      int finalMin = hotProofMin % cycleMin;
+      Serial.printf("[%s] HOTPROOF Initialization | cycleMin: %d | NoOfLoop: %d | finalMin: %d\n", 
+                    getFormattedTime(remainingMin).c_str(), cycleMin, NoOfLoop, finalMin);
+    }  } else if (currentState == HOTPROOF) {
+    currentState = PROOF;
+    if (proofHr == 0.0) {
+      Serial.println("Skipping the Proof Process");
+      moveToNextValidState();
+    } else if (DebugLevel >= 1) {
+      int totalProofMin = (int)(proofHr * 60.0 + 0.5); 
+      Serial.printf("Starting Process: PROOF | cycleMin: %d | NoOfLoop: %d | finalMin: %d\n", totalProofMin, 1, totalProofMin);
     }
-
-    if (currentState == MENU_SELECTION) {
-      Serial.println("==================================================");
-      Serial.print("[SYSTEM] Menu Selection Process Initialized.\n");
-      Serial.print("[SYSTEM] Operation Mode: ");
-      Serial.println((operationMode == MODE_STANDALONE) ? "Standalone" : "WIFI");
-      Serial.println("==================================================");
+  } else if (currentState == PROOF) {
+    currentState = BAKE;
+    if (bakeMin == 0) {
+      Serial.println("Skipping the Bake Process");
+      moveToNextValidState();
+    } else if (DebugLevel >= 1) {
+      int cycleMin = 60;
+      int NoOfLoop = bakeMin / cycleMin;
+      int finalMin = bakeMin % cycleMin;
+      Serial.printf("Starting Process: BAKE | cycleMin: %d | NoOfLoop: %d | finalMin: %d\n", cycleMin, NoOfLoop, finalMin);
+    }
+  } else if (currentState == BAKE) {
+    longPress(RunResetPin);
+    currentState = DONE;
+    if (DebugLevel >= 1) {
+      Serial.println("Sourdough is done");
     }
   }
 }
@@ -745,23 +795,39 @@ void loop() {
   if (triggerRun) {
     triggerRun = false; 
     if (currentState == MENU_SELECTION) {
+      saveSettingsToEEPROM();
+      calculateRemainingTime();
+      isPaused = false;
+
+      // Log selected options at the beginning of the Sourdough process execution loop
+      if (DebugLevel >= 1) {
+        Serial.println("==================================================");
+        Serial.println("[SOURDOUGH] Process Sequence Initiated.");
+        Serial.printf("[SOURDOUGH] - Knead time   : %d min\n", kneadMin);
+        Serial.printf("[SOURDOUGH] - Degas time   : %d min\n", degasMin);
+        Serial.printf("[SOURDOUGH] - HotProof time: %.1f hr\n", hotProofHr);
+        Serial.printf("[SOURDOUGH] - Proof time   : %.1f hr\n", proofHr);
+        Serial.printf("[SOURDOUGH] - Bake time    : %d min\n", bakeMin);
+        Serial.printf("[SOURDOUGH] - Bake Colour  : %s\n", getBakeColourName(bakeColour).c_str());
+        Serial.printf("[SOURDOUGH] - Est Duration : %s\n", getFormattedTime(remainingMin).c_str());
+        Serial.println("==================================================");
+      }
+      
       currentState = KNEADING;
       breadStateStep = 0;
       loopCounter = 0;
       stepActive = false;
-      previousMillis = millis(); 
-      saveSettingsToEEPROM();
+      previousMillis = millis();
 
-      Serial.println("\n==================================================");
-      Serial.println("[SYSTEM] --- Sourdough Process Started ---");
-      Serial.print("[PARAM]  Bake Colour : "); Serial.println(getBakeColourName(bakeColour));
-      Serial.print("[PARAM]  Knead Time  : "); Serial.print(kneadMin); Serial.println(" min");
-      Serial.print("[PARAM]  Degas Time  : "); Serial.print(degasMin); Serial.println(" min");
-      Serial.print("[PARAM]  HotProof    : "); Serial.print(hotProofHr, 1); Serial.println(" hr");
-      Serial.print("[PARAM]  Proof Time  : "); Serial.print(proofHr, 1); Serial.println(" hr");
-      Serial.print("[PARAM]  Bake Time   : "); Serial.print(bakeMin); Serial.println(" min");
-      Serial.print("[PARAM]  Total Time  : "); Serial.println(getFormattedTime(remainingMin));
-      Serial.println("==================================================\n");
+      if (kneadMin == 0) {
+        Serial.println("Skipping the Knead Process");
+        moveToNextValidState();
+      } else if (DebugLevel >= 1) {
+        int cycleMin = 30;
+        int NoOfLoop = kneadMin / cycleMin;
+        int finalMin = kneadMin % cycleMin;
+        Serial.printf("Starting Process: KNEADING | cycleMin: %d | NoOfLoop: %d | finalMin: %d\n", cycleMin, NoOfLoop, finalMin);
+      }
     }
   }
 
@@ -804,24 +870,30 @@ void loop() {
   
   if (currentMillis - previousMillis >= currentInterval) {
     previousMillis = currentMillis;
+    
+    // Remaining counts down and active spinning marker triggers
     if (remainingMin > 0) remainingMin--;
     spinnerIdx = (spinnerIdx + 1) % 4;
 
     if (DebugLevel >= 2) {
       if (currentState != lastLoggedState || breadStateStep != lastLoggedStep || loopCounter != lastLoggedLoop) {
-        Serial.print("["); Serial.print(getFormattedTime(remainingMin));
-        Serial.print("] Processing Active -> Stage: "); Serial.print(getStateName(currentState));
-        Serial.print(" | Step: "); Serial.print(breadStateStep);
-        Serial.print(" | Loop: "); Serial.println(loopCounter);
-
+        Serial.printf("[%s] State: %s | Step: %d | Loop: %d\n", getFormattedTime(remainingMin).c_str(), getStateName(currentState).c_str(), breadStateStep, loopCounter);
         lastLoggedState = currentState;
         lastLoggedStep = breadStateStep;
         lastLoggedLoop = loopCounter;
       }
     }
+    
+    if (remainingMin <= 0 && currentState != DONE) {
+      longPress(RunResetPin);
+      currentState = DONE;
+      if (DebugLevel >= 1) {
+        Serial.println("Sourdough is done");
+      }
+    }
   }
 
-  // --- Sourdough Step Sequencing Automation Engine ---
+  // --- Sourdough Mechanical Phase Driver ---
   switch (currentState) {
     case KNEADING: {
       int cycleMin = 30;
@@ -870,10 +942,7 @@ void loop() {
         }
       }
       if (breadStateStep == 2) {
-        loopCounter = 0;
-        breadStateStep = 0;
-        stepActive = false;
-        currentState = DEGAS;
+        moveToNextValidState();
       }
       break;
     }
@@ -886,10 +955,6 @@ void loop() {
       if (!stepActive) {
         if (breadStateStep == 0) {
           if (loopCounter < NoOfLoop) {
-            Serial.print("["); Serial.print(getFormattedTime(remainingMin));
-            Serial.print("] LoopCounter: "); Serial.print(loopCounter);
-            Serial.print(" | CycleMin: "); Serial.println(cycleMin);
-
             longPress(RunResetPin);
             shortPress(MenuPin, 7);
             shortPress(MinusPin, 9);
@@ -902,9 +967,6 @@ void loop() {
         }
         if (breadStateStep == 1) {
           if (finalMin > 0) {
-            Serial.print("["); Serial.print(getFormattedTime(remainingMin));
-            Serial.print("] FinalMin: "); Serial.println(finalMin);
-
             longPress(RunResetPin);
             shortPress(MenuPin, 7);
             shortPress(MinusPin, 9);
@@ -932,10 +994,7 @@ void loop() {
         }
       }
       if (breadStateStep == 2) {
-        loopCounter = 0;
-        breadStateStep = 0;
-        stepActive = false;
-        currentState = HOTPROOF;
+        moveToNextValidState();
       }
       break;
     }
@@ -947,24 +1006,12 @@ void loop() {
       int finalMin = hotProofMin % cycleMin;
 
       if (!stepActive) {
-        if (breadStateStep == 0 && loopCounter == 0) {
-          Serial.print("["); Serial.print(getFormattedTime(remainingMin));
-          Serial.print("] Setup Params -> CycleMin: "); Serial.print(cycleMin);
-          Serial.print(" | NoOfLoop: "); Serial.print(NoOfLoop);
-          Serial.print(" | FinalMin: "); Serial.println(finalMin);
-        }
-
         if (breadStateStep == 0) {
           if (loopCounter < NoOfLoop) {
-            Serial.print("["); Serial.print(getFormattedTime(remainingMin));
-            Serial.print("] LoopCounter: "); Serial.print(loopCounter);
-            Serial.print(" | CycleMin: "); Serial.println(cycleMin);
-
             longPress(RunResetPin);
-            executeBakeColourSequence();
             shortPress(MenuPin, 9);
             shortPress(MinusPin, 10);
-            shortPress(RunResetPin, 1);
+            shortPress(RunResetPin);
             stepTimer = millis();
             stepActive = true;
           } else {
@@ -973,11 +1020,7 @@ void loop() {
         }
         if (breadStateStep == 1) {
           if (finalMin > 0) {
-            Serial.print("["); Serial.print(getFormattedTime(remainingMin));
-            Serial.print("] FinalMin: "); Serial.println(finalMin);
-
             longPress(RunResetPin);
-            executeBakeColourSequence();
             shortPress(MenuPin, 9);
             shortPress(MinusPin, 10);
             shortPress(RunResetPin);
@@ -1004,34 +1047,22 @@ void loop() {
         }
       }
       if (breadStateStep == 2) {
-        loopCounter = 0;
-        breadStateStep = 0;
-        stepActive = false;
-        currentState = PROOF;
+        moveToNextValidState();
       }
       break;
     }
 
     case PROOF: {
-      int cycleMin = 60;
-      int NoOfLoop = 0;
       int finalMin = (int)(proofHr * 60.0 + 0.5);
 
       if (!stepActive) {
         longPress(RunResetPin);
-        
-        Serial.print("["); Serial.print(getFormattedTime(remainingMin));
-        Serial.print("] Setup Params -> CycleMin: "); Serial.print(cycleMin);
-        Serial.print(" | NoOfLoop: "); Serial.print(NoOfLoop);
-        Serial.print(" | FinalMin: "); Serial.println(finalMin);
-
         stepTimer = millis();
         stepActive = true;
       } else {
         unsigned long targetDuration = testRun ? (finalMin * 1000UL) : (finalMin * 60000UL);
         if (millis() - stepTimer >= targetDuration) {
-          stepActive = false;
-          currentState = BAKE;
+          moveToNextValidState();
         }
       }
       break;
@@ -1043,24 +1074,13 @@ void loop() {
       int finalMin = bakeMin % cycleMin;
 
       if (!stepActive) {
-        if (breadStateStep == 0 && loopCounter == 0) {
-          Serial.print("["); Serial.print(getFormattedTime(remainingMin));
-          Serial.print("] Setup Params -> CycleMin: "); Serial.print(cycleMin);
-          Serial.print(" | NoOfLoop: "); Serial.print(NoOfLoop);
-          Serial.print(" | FinalMin: "); Serial.println(finalMin);
-        }
-
         if (breadStateStep == 0) {
           if (loopCounter < NoOfLoop) {
-            Serial.print("["); Serial.print(getFormattedTime(remainingMin));
-            Serial.print("] LoopCounter: "); Serial.print(loopCounter);
-            Serial.print(" | CycleMin: "); Serial.println(cycleMin);
-
             longPress(RunResetPin);
             executeBakeColourSequence(); 
             shortPress(MenuPin, 13);
             shortPress(MinusPin, 10);
-            shortPress(RunResetPin, 1);
+            shortPress(RunResetPin);
             stepTimer = millis();
             stepActive = true;
           } else {
@@ -1069,9 +1089,6 @@ void loop() {
         }
         if (breadStateStep == 1) {
           if (finalMin > 0) {
-            Serial.print("["); Serial.print(getFormattedTime(remainingMin));
-            Serial.print("] FinalMin: "); Serial.println(finalMin);
-
             longPress(RunResetPin);
             executeBakeColourSequence(); 
             shortPress(MenuPin, 13);
@@ -1100,11 +1117,7 @@ void loop() {
         }
       }
       if (breadStateStep == 2) {
-        longPress(RunResetPin);
-        currentState = DONE;
-        stepActive = false;
-        breadStateStep = 0;
-        loopCounter = 0;
+        moveToNextValidState();
       }
       break;
     }
