@@ -1,0 +1,65 @@
+Sourdough Maker Change Log.
+Logs of Prompts sends to Gemini AI.
+
+*Release 1.1
+
+Refer to the attached code. This is the ESP8266 Sourdough maker project. Do not include any ESP32 codes. Keep all previously defined log messages intact, do not try to streamline the code by removing any of the serial.print statements and debug messages. 
+Produce the fully updated source code, followed by an explanation of changes and code snippets for modified sections.
+
+*1 add a const for release_version, and set this version to “1.1”. Append this version to the title in the web page or the logs. 
+*2 at the start of the program once this device successfully connected to the WIFI If debuglevel >=1 log the SSID and IP address of this device before any client connection. 
+*3 When a user device has connected to this device, If debugLevel 1, logs the IP address of the user’s device.
+*4 This code was written to handle both ServoMode if the ServoMode const is set to true, and Digital I/O mode if the ServoMode const is set to false. Convert this program to only handle digital I/O mode, and remove all codes written for ServoMode. 
+
+*Release 1.2
+
+Refer to the attached code. This is the ESP8266 Sourdough maker project. Do not include any ESP32 codes. Keep all previously defined log messages intact, do not try to streamline the code by removing any of the serial.print statements and debug messages. 
+Produce the fully updated source code, followed by an explanation of changes and code snippets for modified sections.
+
+*1 assign a stable pin on the ESP8266  for the “drop” function for the interface with the bread machine. 
+*2 add the Drop function to the web page for menu selection following the Knead function, options are 0,1. 0 means skip this function during the sourdough process, 1 means execute it one time.
+*3 update the sourdough process to execute the drop function after the Knead function has finished, by shortpressing the drop pin 1 time. No need for any longpress function. No need for multiple cycles nor cycle time.  Add the usual debug messages when drop function is executed.
+
+
+*Release 1.2
+
+
+Refer to the attached code. This is the ESP8266 Sourdough maker project. Do not include any ESP32 codes. Keep all previously defined log messages intact, do not try to streamline the code by removing any of the serial.print statements and debug messages. 
+Produce the fully updated source code, followed by an explanation of changes and code snippets for modified sections.
+*1 Change the web page from fixed functions and options to a free form input of multiple lines of Sourdough instructions (the Sourdough profile) as follows:
+
+*  The menu selection process:
+*  Display heading “Billy Sourdough” followed by the release and version.
+On the next line display  total time in hh:mm:ss format (hh =hour, mm=minute, ss=second) of the Sourdough process  dynamically updated as calculated from  the list of Sourdough  instructions, or the remainingTime once Sourdough  has started. 
+
+* Provide HTML Multiline line input box for input for multiple lines of Sourdough instructions ( the Sourdough  profile) and perform input  validation with the following rule:
+The first line is the breadName of max 50 characters (truncated to 50 if length of breadName > 50).
+Followed by maximum 10 lines of Sourdough Instructions in this format : “functionName  hh:mm:ss” or “functionName Option” where: 
+“functioName” is one of the following functions or options n the Sourdough process (case insensitive):
+Colour or Color, Knead, Drop, Degas, Proof, Rest, Bake.
+If functionName is Knead, Degas, Proof, Rest or Bake, it must be followed by “hh:mm:ss”  which is Time in hours, minutes and seconds.
+If functionName is Drop, it must not be followed by anything. 
+if functionName is Colour or Color, it must be followed by the option  Light, Medium or Dark.
+
+Refer to this  example for a valid coffee Sourdough  profile:
+Pain de Campagne (France)
+Knead 00:30:00
+Drop 
+Degas 01:00:00
+Proof 00:25:00
+Rest  04:00:00
+Colour Dark
+Bake 01:30:00
+
+At program start, the previous Sourdough profile will be restored from EEPROM to populate the input box above to be edited by user.
+Once a user clicks the “Confirm” button,  the system will validate it, and syntax errors will be highlighted  with the appropriate  error message on the web page.
+If syntax error exists, the input box will be unlocked for the user to edit.
+If there are no syntax errors, the Sourdough  profile will be reformatted in proper format, e.g. trimming any unwanted lines, or spaces.The Edit button and the Confirm button will be displayed. 
+Users can either  click the “Run” button to start the Sourdough process, or click the “Edit” button to edit the Sourdough  profile further. 
+When the “Run” button is clicked, the Sourdough profile will be saved into EEPROM. The Sourdough process will start.
+
+
+Each line of Sourdough Instruction will be processed in turn. The whole instruction will be  highlighted in blue and locked down (do not allow edit). The hh:mm:ss will be displayed as the remaining time in mm:ss of that instruction that changes dynamically as the Sourdough Instruction is processed.
+For the lines of Sourdough instructions not yet processed, they will be displayed with the functionName in front , followed by  and editable hh:mm:ss field. and the Update button. User can change the values of hh:mm:ss and click the update button to confirm the new value. Once updated, the total remaining time will be updated dynamically.
+
+
