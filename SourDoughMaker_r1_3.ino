@@ -285,7 +285,7 @@ void startInstructionSequence(InstructionType type) {
 
     case TYPE_PROOF:
       shortPress(MenuPin, 9);    
-      shortPress(MinusPin, 9);  
+      shortPress(MinusPin, 10);  
       shortPress(RunResetPin);
       break;
 
