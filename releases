@@ -78,6 +78,7 @@ Starting sequence for Knead:
         shortPress(MinusPin, 10);  
         shortPress(RunResetPin);
 Ending sequence for Knead:
+ 	  shortPress(RunResetPin, 1);
         longPress(RunResetPin);
 
 Maximum period for Degas is 1680 seconds
@@ -90,6 +91,7 @@ Ending sequence for Degas:
         shortPress(MinusPin, 10);  
         shortPress(RunResetPin);
 	  Delay 5 seconds;
+ 	  shortPress(RunResetPin, 1);
         longPress(RunResetPin);
 
 
@@ -99,17 +101,19 @@ Starting sequence for Proof:
         shortPress(MinusPin, 10);  
         shortPress(RunResetPin);
 Ending sequence for Proof:
+ 	  shortPress(RunResetPin, 1);
         longPress(RunResetPin);
 
 
 
 
 Maximum period for Bake is 3480 seconds
-Starting sequence for Proof:
+Starting sequence for Bake:
         shortPress(MenuPin, 13);    
         shortPress(MinusPin, 10);  
         shortPress(RunResetPin);
-Ending sequence for Proof:
+Ending sequence for Bake:
+ 	  shortPress(RunResetPin, 1);
         longPress(RunResetPin);
 
 
@@ -128,4 +132,16 @@ Seperator
 Erase Settings
 Switch to 
 
+
+create a new debug sketch to test the following pins: 
+// --- Stable Pin Assignments ---
+const int RunResetPin = D1; // GPIO5
+const int MinusPin    = D2; // GPIO4
+const int DropPin     = D5; // GPIO14
+const int MenuPin     = D6; // GPIO12
+const int ColourPin   = D7; // GPIO13
+
+When program start set all pins to high.
+Then in the loop, turn each pin to low status for 0.5 seconds in tur
+Log  which  pin is being turned low.
 
