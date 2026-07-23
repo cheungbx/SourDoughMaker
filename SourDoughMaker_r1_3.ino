@@ -307,7 +307,6 @@ void endInstructionSequence(InstructionType type) {
     case TYPE_KNEAD:
     case TYPE_PROOF:
     case TYPE_BAKE:
-      shortPress(RunResetPin,1);
       longPress(RunResetPin);
       break;
 
@@ -318,7 +317,6 @@ void endInstructionSequence(InstructionType type) {
       shortPress(MinusPin, 9);  
       shortPress(RunResetPin);
       delay(10000); // turn the paddle for 10 seconds to simulate the folding acction during degas
-      shortPress(RunResetPin, 1);
       longPress(RunResetPin);
     default:
       break;
