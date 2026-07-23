@@ -141,3 +141,19 @@ When program start set all pins to high.
 Then in the loop, turn each pin to low status for 0.5 seconds in tur
 Log  which  pin is being turned low.
 
+
+*Release 1.4
+Refer to the attached code. This is the ESP8266 Sourdough maker project. Do not include any ESP32 codes. Keep all previously defined log messages intact, do not try to streamline the code by removing any of the serial.print statements and debug messages. 
+Produce the fully updated source code, followed by an explanation of changes
+*1 Change Pin Reassignment of  DropPin from D5 to D0 (GPIO16) to completely eliminate the I2C SCL bus collision. 
+*2 Assign Pin  D4 as SDA (GPIO2) and D5 as SCL (GPIO14) for the I2C SSD1306. Setit up to display the following:
+Title “Billy Sourdough” followed by release and version no.
+Separator
+If standalone mode, display “Standalone SSID:” followed by the SSID, on the next line show the IP address of this device (no subheading)
+if WIFI mode, display “WIFI SSID:” followed by the SSID of the WIFI router to be connected to, on the next line shows the IP address assigned to this device (no subheading)
+one blank line.
+Status: either Input, Confirm, Running, or Done (e.g. Status: Running)
+on the same line followed by a time in hh:mm:ss format. The time is either the Total time (if in input/confirm/done mode) or the Remaining time (if in running mode) . This time needs to be dynamically updated. 
+The Instruction number/Total number of instructions, followed by the  current instruction and the remaining time for that instruction: e.g. 1/7 Knead 00:29:30.
+
+
