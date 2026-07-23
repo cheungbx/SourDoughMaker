@@ -307,6 +307,7 @@ void endInstructionSequence(InstructionType type) {
     case TYPE_KNEAD:
     case TYPE_PROOF:
     case TYPE_BAKE:
+      shortPress(RunResetPin,1);
       longPress(RunResetPin);
       break;
 
@@ -316,7 +317,8 @@ void endInstructionSequence(InstructionType type) {
       shortPress(MenuPin, 7);    
       shortPress(MinusPin, 9);  
       shortPress(RunResetPin);
-      delay(5000);
+      delay(10000); // turn the paddle for 10 seconds to simulate the folding acction during degas
+      shortPress(RunResetPin, 1);
       longPress(RunResetPin);
     default:
       break;
@@ -1032,7 +1034,6 @@ void moveToNextInstruction() {
   currentSubStepSec = 0;
 
   if (currentStepIdx >= instructionCount) {
-    longPress(RunResetPin);
     currentState = DONE;
     printLogHeader();
     Serial.println("[SOURDOUGH] Process Complete: Bread is Done.");
