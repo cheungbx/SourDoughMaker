@@ -62,4 +62,70 @@ When the “Run” button is clicked, the Sourdough profile will be saved into E
 Each line of Sourdough Instruction will be processed in turn. The whole instruction will be  highlighted in blue and locked down (do not allow edit). The hh:mm:ss will be displayed as the remaining time in mm:ss of that instruction that changes dynamically as the Sourdough Instruction is processed.
 For the lines of Sourdough instructions not yet processed, they will be displayed with the functionName in front , followed by  and editable hh:mm:ss field. and the Update button. User can change the values of hh:mm:ss and click the update button to confirm the new value. Once updated, the total remaining time will be updated dynamically.
 
+*Release 1.3
+
+Refer to the attached code. This is the ESP8266 Sourdough maker project. Do not include any ESP32 codes. Keep all previously defined log messages intact, do not try to streamline the code by removing any of the serial.print statements and debug messages. 
+Produce the fully updated source code, followed by an explanation of changes and code snippets for modified sections.
+
+*1 Some functions of the bread machine can only operate for a maximum period. Modify the code such that  if the time required for each roasting instructions exceeds this this maximum period, the initiation and ending sequences must be repeated multiple times until the time required by the Sourdough instruction ends. The ending sequences need to be repeated once again at the end of the roasting instruction unless the ending time  of the instruction is also the ending time of the maximum period.
+
+Here are the maximum period  for the functions that require modifications :
+Maximum period for Knead is 1680 seconds
+Starting sequence for Knead:
+ 	  shortPress(RunResetPin, 1);
+        longPress(RunResetPin);
+        shortPress(MenuPin, 7);    
+        shortPress(MinusPin, 10);  
+        shortPress(RunResetPin);
+Ending sequence for Knead:
+        longPress(RunResetPin);
+
+Maximum period for Degas is 1680 seconds
+Starting sequence for Degas:
+ 	  shortPress(RunResetPin, 1);
+        longPress(RunResetPin);
+        shortPress(MenuPin, 7);    
+        shortPress(MinusPin, 10);  
+        shortPress(RunResetPin);
+	  Delay 5 seconds;
+        longPress(RunResetPin);
+		
+Ending sequence for Degas:
+        None.
+Maximum period for Proof is 3480 seconds
+Starting sequence for Proof:
+        shortPress(MenuPin, 7);    
+        shortPress(MinusPin, 9);  
+        shortPress(RunResetPin);
+Ending sequence for Proof:
+        longPress(RunResetPin);
+
+
+
+
+Maximum period for Bake is 3480 seconds
+Starting sequence for Proof:
+        shortPress(MenuPin, 13);    
+        shortPress(MinusPin, 10);  
+        shortPress(RunResetPin);
+Ending sequence for Proof:
+        longPress(RunResetPin);
+
+
+When modifying the codes, structure the code to avoid repeating the starting sequence codes in multiple places.
+
+Keep the logic intact for Drop, Colour and Rest
+
+
+Refer to the attached code:
+On the web page that is shown after confirm is clicked, arrange the following buttons as follows, each on it's own line: 
+Run
+Edit
+Seperator
+Restart
+Seperator
+Erase Settings
+Switch to 
+
+
 
