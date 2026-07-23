@@ -96,7 +96,7 @@ Ending sequence for Degas:
 Maximum period for Proof is 3480 seconds
 Starting sequence for Proof:
         shortPress(MenuPin, 7);    
-        shortPress(MinusPin, 9);  
+        shortPress(MinusPin, 10);  
         shortPress(RunResetPin);
 Ending sequence for Proof:
         longPress(RunResetPin);
