@@ -82,6 +82,8 @@ Ending sequence for Knead:
 
 Maximum period for Degas is 1680 seconds
 Starting sequence for Degas:
+        None.		
+Ending sequence for Degas:
  	  shortPress(RunResetPin, 1);
         longPress(RunResetPin);
         shortPress(MenuPin, 7);    
@@ -89,9 +91,8 @@ Starting sequence for Degas:
         shortPress(RunResetPin);
 	  Delay 5 seconds;
         longPress(RunResetPin);
-		
-Ending sequence for Degas:
-        None.
+
+
 Maximum period for Proof is 3480 seconds
 Starting sequence for Proof:
         shortPress(MenuPin, 7);    
@@ -126,6 +127,5 @@ Restart
 Seperator
 Erase Settings
 Switch to 
-
 
 
