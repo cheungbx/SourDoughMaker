@@ -17,12 +17,11 @@ typedef int32_t s32_t;
 #pragma GCC diagnostic pop 
 
 // --- Configuration Flags & Constants ---
-const char* release_version = "1.4";
-const int DebugLevel = 3; 
+const char* release_version = "1.2";
+const int DebugLevel = 2; 
 
 /*  
 DonLim DL-T065-K Bread Machine
-Solder a 10-pin female header on the circuit board for the following buttons , GND and 5V.
 Pin 1 - ground Black 
 Pin 2 - 5V Red
 Pin 3 - RunReset button Orange
@@ -42,14 +41,11 @@ const int ColourPin   = D7; // GPIO13
 
 // --- AP Default Fallback Configuration ---
 const char* defaultPassword = "99819872"; 
-String apSsid = "SourDough"; // Will dynamically append chip signature on initialization
+String apSsid = "SourDough"; 
 
 // Dynamic Network Strings populated out of EEPROM storage
 String clientSsid = "";
 String clientPassword = "";
-
-bool clientLocked = false;
-IPAddress allowedClientIP;
 
 AsyncWebServer server(80);
 
@@ -99,11 +95,6 @@ bool stepActive = false;
 int loopCounter = 0; 
 long currentStepRemainingSec = 0;
 
-// Trackers to suppress duplicate periodic log messages
-EngineState lastLoggedState = MENU_SELECTION;
-int lastLoggedStep = -1;
-int lastLoggedLoop = -1;
-
 // Spinning indicator
 const char spinner[] = {'/', '-', '\\', '|'};
 int spinnerIdx = 0;
@@ -115,7 +106,7 @@ const int ADDR_OP_MODE      = 6;
 const int ADDR_WIFI_MARKER  = 7;  
 const int ADDR_WIFI_SSID    = 8;   
 const int ADDR_WIFI_PASS    = 40;  
-const int ADDR_PROFILE_TEXT = 110; // Stores raw multi-line profile string up to 800 bytes
+const int ADDR_PROFILE_TEXT = 110; 
 
 const uint8_t VALID_CONFIG_MAGIC = 0xAA; 
 const uint8_t VALID_WIFI_MAGIC   = 0xBB;
@@ -151,7 +142,6 @@ String getFormattedTimeHMS(long totalSeconds) {
   return String(buf);
 }
 
-// Calculate Total Sourdough Process Duration in seconds
 long calculateTotalDurationSec() {
   long total = 0;
   for (int i = 0; i < instructionCount; i++) {
@@ -175,6 +165,13 @@ long calculateTotalRemainingSec() {
   return remaining;
 }
 
+// Standard Header Printer
+void printLogHeader() {
+  Serial.print("[");
+  Serial.print(getFormattedTimeHMS(calculateTotalRemainingSec()));
+  Serial.print("] ");
+}
+
 String getPinName(int pin) {
   if (pin == MenuPin) return "MenuPin";
   if (pin == MinusPin) return "MinusPin";
@@ -191,19 +188,9 @@ String getBakeColourName(BakeColourOption opt) {
 }
 
 String getOpModeName(OpModeOption opt) {
-  if (opt == MODE_STANDALONE) return "STANDALONE (Access Point)";
-  if (opt == MODE_WIFI) return "WIFI (Client Station)";
+  if (opt == MODE_STANDALONE) return "STANDALONE";
+  if (opt == MODE_WIFI) return "WIFI";
   return "NONE / UNCONFIGURED";
-}
-
-String getStateName(EngineState state) {
-  switch (state) {
-    case WIFI_CONFIG_AP: return "WIFI_CONFIG_AP";
-    case MENU_SELECTION: return "MENU_SELECTION";
-    case RUNNING_STEP:   return instructions[currentStepIdx].functionName;
-    case DONE:           return "DONE";
-  }
-  return "UNKNOWN";
 }
 
 void computeDynamicAPProperties() {
@@ -216,11 +203,11 @@ void computeDynamicAPProperties() {
   }
 }
 
-// --- Dynamic Pin Press Actions (Digital I/O Only) ---
+// --- Dynamic Pin Press Actions ---
 void shortPress(int pin, int numberOfTimes) {
   if (DebugLevel >= 2) {
-    Serial.print("["); Serial.print(getFormattedTimeHMS(calculateTotalRemainingSec())); 
-    Serial.print("] ShortPress -> "); Serial.print(getPinName(pin));
+    printLogHeader();
+    Serial.print("ShortPress -> "); Serial.print(getPinName(pin));
     Serial.print(" "); Serial.println(numberOfTimes);
   }
 
@@ -234,9 +221,8 @@ void shortPress(int pin, int numberOfTimes) {
 
 void longPress(int pin) {
   if (DebugLevel >= 1) {
-    Serial.print("["); 
-    Serial.print(getFormattedTimeHMS(calculateTotalRemainingSec())); 
-    Serial.print("] LongPress -> "); 
+    printLogHeader();
+    Serial.print("LongPress -> "); 
     Serial.println(getPinName(pin));
   }
 
@@ -248,8 +234,8 @@ void longPress(int pin) {
 
 void executeBakeColourSequence() {
   if (DebugLevel >= 1) {
-    Serial.print("["); Serial.print(getFormattedTimeHMS(calculateTotalRemainingSec())); 
-    Serial.print("] Execution Routing -> BakeColour Process Initialized. Selection: ");
+    printLogHeader();
+    Serial.print("Execution Routing -> BakeColour Process Initialized. Selection: ");
     Serial.println(getBakeColourName(bakeColour));
   }
 
@@ -257,11 +243,6 @@ void executeBakeColourSequence() {
     shortPress(ColourPin, 1);
   } else if (bakeColour == LIGHT) {
     shortPress(ColourPin, 2);
-  } else {
-    if (DebugLevel >= 1) {
-      Serial.print("["); Serial.print(getFormattedTimeHMS(calculateTotalRemainingSec()));
-      Serial.println("] Execution Routing -> BakeColour is Medium, no adjustments required.");
-    }
   }
 }
 
@@ -389,10 +370,10 @@ void saveSettingsToEEPROM() {
     EEPROM.write(ADDR_PROFILE_TEXT + i, 0);
   }
   
-  for (size_t i = 0; i < rawProfileInput.length() && i < 799; i++) {
-    EEPROM.write(ADDR_PROFILE_TEXT + i, rawProfileInput[i]);
-  }
-  
+// Corrected code:
+for (size_t i = 0; i < rawProfileInput.length() && i < 799; i++) {
+  EEPROM.write(ADDR_PROFILE_TEXT + i, rawProfileInput[i]);
+}
   EEPROM.commit();
 }
 
@@ -411,7 +392,6 @@ void loadSettingsFromEEPROM() {
       String outF, outE;
       if (parseAndValidateProfile(storedText, outF, outE)) {
         rawProfileInput = outF;
-        isConfirmed = true;
       }
     }
   } else {
@@ -419,8 +399,8 @@ void loadSettingsFromEEPROM() {
     String outF, outE;
     parseAndValidateProfile(rawProfileInput, outF, outE);
     rawProfileInput = outF;
-    isConfirmed = true;
   }
+  isConfirmed = false;
 }
 
 void saveOpModeToEEPROM(OpModeOption mode) {
@@ -479,25 +459,30 @@ void loadWifiFromEEPROM() {
 void executeStandaloneAPProcess() {
   WiFi.mode(WIFI_AP);
   WiFi.softAP(apSsid.c_str(), defaultPassword);
+  
+  printLogHeader();
+  Serial.printf("[WIFI] Standalone AP Started -> SSID: %s\n", apSsid.c_str());
+  printLogHeader();
+  Serial.printf("[WIFI] Device IP Address: %s\n", WiFi.softAPIP().toString().c_str());
 }
 
 bool executeWifiConnectionProcess() {
   WiFi.mode(WIFI_STA);
   WiFi.begin(clientSsid.c_str(), clientPassword.c_str());
-  Serial.printf("[SYSTEM] Connecting to WIFI router: %s\n", clientSsid.c_str()); 
-  if (DebugLevel >= 3) {
-    Serial.printf("[SYSTEM] WIFI Password: %s\n", clientPassword.c_str());   
-  }
+  
+  printLogHeader();
+  Serial.printf("[WIFI] Connecting to Router -> SSID: %s | Password: %s\n", clientSsid.c_str(), clientPassword.c_str()); 
+  
   unsigned long startAttempt = millis();
   while (WiFi.status() != WL_CONNECTED && (millis() - startAttempt < 20000UL)) {
-    Serial.print(".");
     delay(500);
   }
-  Serial.println();
 
   if (WiFi.status() != WL_CONNECTED) {
-    Serial.printf("[SYSTEM] Failed to connect to WIFI router %s in 20 seconds. \n", clientSsid.c_str());
-    Serial.printf("Restarting in Standalone mode. Double check WIFI set up. \n");
+    printLogHeader();
+    Serial.printf("[WIFI] Connection Failed -> Could not connect to SSID: %s\n", clientSsid.c_str());
+    printLogHeader();
+    Serial.println("[SYSTEM] Resetting mode selection and rebooting...");
 
     EEPROM.write(ADDR_OP_MODE, (uint8_t)MODE_NONE);
     EEPROM.commit();
@@ -506,14 +491,14 @@ bool executeWifiConnectionProcess() {
     return false;
   }
 
-  if (DebugLevel >= 1) {
-    Serial.printf("[WIFI] Connected to SSID: %s | Local IP: %s\n", clientSsid.c_str(), WiFi.localIP().toString().c_str());
-  }
+  printLogHeader();
+  Serial.println("[WIFI] Status: CONNECTED");
+  printLogHeader();
+  Serial.printf("[WIFI] Device IP Address: %s\n", WiFi.localIP().toString().c_str());
 
   return true;
 }
 
-// Helper to send HTTP responses with explicit keep-alive headers
 void sendHtmlResponse(AsyncWebServerRequest *request, const String &content) {
   AsyncWebServerResponse *response = request->beginResponse(200, "text/html", content);
   response->addHeader("Connection", "keep-alive");
@@ -570,7 +555,6 @@ String generateHtml() {
   html += "</style>";
   
   html += "<script>";
-  // Smart dynamic reload: suppressed if user is focused on an input/textarea element
   if (currentState == RUNNING_STEP || isConfirmed) {
     html += "setInterval(function() {";
     html += "  var activeTag = document.activeElement ? document.activeElement.tagName : '';";
@@ -600,18 +584,18 @@ String generateHtml() {
     }
 
     if (!isConfirmed) {
-      // Unlocked Textbox
       html += "<form action='/confirm_profile' method='POST'>";
       html += "<textarea name='profile'>" + rawProfileInput + "</textarea><br>";
       html += "<input type='submit' value='Confirm'>";
       html += "</form>";
+
     } else {
       // Formatted locked profile display
       html += "<form action='/confirm_profile' method='POST'>";
       html += "<textarea name='profile' readonly style='background-color:#eef2f5;'>" + rawProfileInput + "</textarea><br>";
       html += "<button type='button' class='edit' onclick='location.href=\"/edit_profile\"'>Edit</button>";
+      html += "</form>"; // Close form BEFORE the Run button
       html += "<button type='button' onclick='location.href=\"/run\"'>Run</button>";
-      html += "</form>";
     }
   } 
   // State 2: RUNNING_STEP or DONE
@@ -682,27 +666,10 @@ String generateHtml() {
   return html;
 }
 
-bool isAuthorizedClient(AsyncWebServerRequest *request) {
-  IPAddress clientIP = request->client()->remoteIP();
-  if (!clientLocked) {
-    allowedClientIP = clientIP;
-    clientLocked = true;
-    
-    if (DebugLevel >= 1) {
-      Serial.printf("[CLIENT] User Device Connected. IP: %s\n", clientIP.toString().c_str());
-    }
-    return true;
-  }
-  return (clientIP == allowedClientIP);
-}
-
 void setup() {
   Serial.begin(74880);
   delay(200); 
 
-  for (int i = 0; i < 5; i++) Serial.println("==================================================");
-  Serial.printf("\n--- SYSTEM BOOT (Release %s) ---\n", release_version);
-  
   pinMode(MenuPin, OUTPUT);
   pinMode(MinusPin, OUTPUT);
   pinMode(RunResetPin, OUTPUT);
@@ -716,37 +683,42 @@ void setup() {
   digitalWrite(DropPin, HIGH);
 
   loadSettingsFromEEPROM();
-
   computeDynamicAPProperties();
   loadWifiFromEEPROM();
   OpModeOption storedMode = loadOpModeFromEEPROM();
 
+  printLogHeader();
+  Serial.printf("PROGRAM START -> Billy Sourdough Release %s\n", release_version);
+
+  printLogHeader();
+  Serial.printf("[SYSTEM] Wi-Fi Operation Mode: %s\n", getOpModeName(storedMode).c_str());
+
   if (storedMode == MODE_STANDALONE) {
     operationMode = MODE_STANDALONE;
+    printLogHeader();
+    Serial.printf("[WIFI] Target Standalone SSID: %s\n", apSsid.c_str());
+    if (DebugLevel >= 3) {
+      Serial.printf("[WIFI] Expected Password: %s\n", defaultPassword);
+    }
     executeStandaloneAPProcess();
     currentState = MENU_SELECTION; 
   } 
   else if (storedMode == MODE_WIFI) {
     operationMode = MODE_WIFI;
+    printLogHeader();
+    Serial.printf("[WIFI] Target Router SSID: %s\n", clientSsid.c_str());
+     if (DebugLevel >= 3) {
+        Serial.printf("[WIFI] Password: %s\n", clientPassword.c_str());
+     }
     if (executeWifiConnectionProcess()) {
       currentState = MENU_SELECTION; 
     }
   } 
   else {
     currentState = WIFI_CONFIG_AP;
+    printLogHeader();
+    Serial.printf("[WIFI] Provisioning Access Point Mode Active -> SSID: %s | Password: %s\n", apSsid.c_str(), defaultPassword);
     executeStandaloneAPProcess();
-  }
-
-  if (DebugLevel >= 1) {
-    if (operationMode == MODE_WIFI && WiFi.status() == WL_CONNECTED) {
-      Serial.printf("[SYSTEM] Connected Node IP: %s\n", WiFi.localIP().toString().c_str());
-    } else {
-      Serial.printf("[SYSTEM] Broadcast SSID: %s\n", apSsid.c_str());
-      Serial.printf("[SYSTEM] AP IP Address: %s\n",  WiFi.softAPIP().toString().c_str());
-      Serial.printf("[SYSTEM] Connected Node IP: %s\n", WiFi.localIP().toString().c_str());
-    }
-    
-    Serial.printf("[SYSTEM] Active Wi-Fi Mode: %s\n", getOpModeName(operationMode).c_str());
   }
 
   // --- Web Routing Definitions ---
@@ -754,16 +726,11 @@ void setup() {
     if (currentState == WIFI_CONFIG_AP) {
       sendHtmlResponse(request, generateWifiSetupHtml());
     } else {
-      if (!isAuthorizedClient(request)) {
-        request->send(403, "text/plain", "Access Denied: Exclusive Session Active.");
-        return;
-      }
       sendHtmlResponse(request, generateHtml());
     }
   });
 
   server.on("/confirm_profile", HTTP_POST, [](AsyncWebServerRequest *request){
-    if (!isAuthorizedClient(request)) return;
     if (currentState == MENU_SELECTION) {
       if (request->hasParam("profile", true)) {
         String input = request->getParam("profile", true)->value();
@@ -782,8 +749,14 @@ void setup() {
     request->redirect("/");
   });
 
+server.on("/run", HTTP_ANY, [](AsyncWebServerRequest *request){
+    if (currentState == MENU_SELECTION && isConfirmed) {
+      triggerRun = true; 
+    }
+    request->redirect("/");
+  });
+
   server.on("/edit_profile", HTTP_GET, [](AsyncWebServerRequest *request){
-    if (!isAuthorizedClient(request)) return;
     if (currentState == MENU_SELECTION) {
       isConfirmed = false;
     }
@@ -791,7 +764,6 @@ void setup() {
   });
 
   server.on("/update_step", HTTP_GET, [](AsyncWebServerRequest *request){
-    if (!isAuthorizedClient(request)) return;
     if (currentState == RUNNING_STEP) {
       if (request->hasParam("idx") && request->hasParam("time")) {
         int idx = request->getParam("idx")->value().toInt();
@@ -807,91 +779,152 @@ void setup() {
     request->redirect("/");
   });
 
-  server.on("/erase_all", HTTP_GET, [](AsyncWebServerRequest *request){
-    if (!isAuthorizedClient(request)) return;
-    if (currentState != MENU_SELECTION) {
-      request->send(403, "text/plain", "Action Denied: Process running.");
+server.on("/erase_all", HTTP_GET, [](AsyncWebServerRequest *request){
+  if (currentState != MENU_SELECTION) {
+    request->send(403, "text/plain", "Action Denied: Process running.");
+    return;
+  }
+  
+  triggerEraseAll = true; 
+
+  String redirectHtml = "<!DOCTYPE html><html><head>"
+                        "<meta name='viewport' content='width=device-width, initial-scale=1.0'>"
+                        "<title>Erasing Settings...</title>"
+                        "<style>body{font-family:Arial,sans-serif;text-align:center;padding-top:50px;background:#f7f9fa;}</style>"
+                        "<script>"
+                        "var seconds = 7;"
+                        "function countdown() {"
+                        "  document.getElementById('timer').innerText = seconds;"
+                        "  if (seconds <= 0) {"
+                        "    window.location.href = '/?nocache=' + new Date().getTime();"
+                        "  } else {"
+                        "    seconds--;"
+                        "    setTimeout(countdown, 1000);"
+                        "  }"
+                        "}"
+                        "window.onload = countdown;"
+                        "</script></head><body>"
+                        "<h2>Erasing Configurations...</h2>"
+                        "<p>EEPROM wiped successfully. Restoring defaults and restarting...</p>"
+                        "<p>Redirecting in <span id='timer'>7</span> seconds...</p>"
+                        "</body></html>";
+
+  AsyncWebServerResponse *response = request->beginResponse(200, "text/html", redirectHtml);
+  response->addHeader("Connection", "close");
+  request->send(response);
+});
+server.on("/switch_mode", HTTP_GET, [](AsyncWebServerRequest *request){
+  if (currentState != MENU_SELECTION) {
+    request->send(403, "text/plain", "Action Denied: Mode locked during execution.");
+    return;
+  }
+
+  if (request->hasParam("to")) {
+    String target = request->getParam("to")->value();
+    if (target == "wifi" || target == "standalone") {
+      targetSwitchMode = (target == "wifi") ? MODE_WIFI : MODE_STANDALONE;
+      triggerSwitchMode = true;
+
+      String redirectHtml = "<!DOCTYPE html><html><head>"
+                            "<meta name='viewport' content='width=device-width, initial-scale=1.0'>"
+                            "<title>Switching Mode...</title>"
+                            "<style>body{font-family:Arial,sans-serif;text-align:center;padding-top:50px;background:#f7f9fa;}</style>"
+                            "<script>"
+                            "var seconds = 7;"
+                            "function countdown() {"
+                            "  document.getElementById('timer').innerText = seconds;"
+                            "  if (seconds <= 0) {"
+                            "    window.location.href = '/?nocache=' + new Date().getTime();"
+                            "  } else {"
+                            "    seconds--;"
+                            "    setTimeout(countdown, 1000);"
+                            "  }"
+                            "}"
+                            "window.onload = countdown;"
+                            "</script></head><body>"
+                            "<h2>Switching Network Mode...</h2>"
+                            "<p>The controller is switching to <b>" + target + "</b> mode and restarting.</p>"
+                            "<p>Reconnecting in <span id='timer'>7</span> seconds...</p>"
+                            "</body></html>";
+
+      AsyncWebServerResponse *response = request->beginResponse(200, "text/html", redirectHtml);
+      response->addHeader("Connection", "close");
+      request->send(response);
       return;
     }
-    triggerEraseAll = true; 
-    request->send(200, "text/plain", "EEPROM Erase Triggered safely. Device is rebooting...");
-  });
+  }
+  request->redirect("/");
+});
 
-  server.on("/switch_mode", HTTP_GET, [](AsyncWebServerRequest *request){
-    if (!isAuthorizedClient(request)) return;
-    if (currentState != MENU_SELECTION) {
-      request->send(403, "text/plain", "Action Denied: Mode locked during execution.");
-      return;
-    }
+server.on("/save_config", HTTP_POST, [](AsyncWebServerRequest *request){
+  if (currentState == WIFI_CONFIG_AP) {
+    int modeVal = MODE_WIFI;
+    if (request->hasParam("opmode", true)) modeVal = request->getParam("opmode", true)->value().toInt();
+    pendingOpMode = (OpModeOption)modeVal;
+    
+    if (request->hasParam("ssid", true)) pendingSsid = request->getParam("ssid", true)->value();
+    if (request->hasParam("password", true)) pendingPassword = request->getParam("password", true)->value();
+    
+    triggerSaveConfig = true;
 
-    if (request->hasParam("to")) {
-      String target = request->getParam("to")->value();
-      if (target == "wifi") {
-        targetSwitchMode = MODE_WIFI;
-        triggerSwitchMode = true;
-        request->send(200, "text/plain", "Switching to WIFI Mode. Device is rebooting...");
-        return;
-      } else if (target == "standalone") {
-        targetSwitchMode = MODE_STANDALONE;
-        triggerSwitchMode = true;
-        request->send(200, "text/plain", "Switching to Standalone Mode. Device is rebooting...");
-        return;
-      }
-    }
-    request->redirect("/");
-  });
+    String redirectHtml = "<!DOCTYPE html><html><head>"
+                          "<meta name='viewport' content='width=device-width, initial-scale=1.0'>"
+                          "<title>Saving Settings...</title>"
+                          "<style>body{font-family:Arial,sans-serif;text-align:center;padding-top:50px;background:#f7f9fa;}</style>"
+                          "<script>"
+                          "var seconds = 7;"
+                          "function countdown() {"
+                          "  document.getElementById('timer').innerText = seconds;"
+                          "  if (seconds <= 0) {"
+                          "    window.location.href = '/?nocache=' + new Date().getTime();"
+                          "  } else {"
+                          "    seconds--;"
+                          "    setTimeout(countdown, 1000);"
+                          "  }"
+                          "}"
+                          "window.onload = countdown;"
+                          "</script></head><body>"
+                          "<h2>Configurations Saved!</h2>"
+                          "<p>Connecting to your Wi-Fi network and restarting...</p>"
+                          "<p>Redirecting in <span id='timer'>7</span> seconds...</p>"
+                          "<p><small><i>Note: If switching networks, make sure your phone is reconnected to the target network.</i></small></p>"
+                          "</body></html>";
 
-  server.on("/save_config", HTTP_POST, [](AsyncWebServerRequest *request){
-    if (currentState == WIFI_CONFIG_AP) {
-      int modeVal = MODE_WIFI;
-      if (request->hasParam("opmode", true)) modeVal = request->getParam("opmode", true)->value().toInt();
-      pendingOpMode = (OpModeOption)modeVal;
-      
-      if (request->hasParam("ssid", true)) pendingSsid = request->getParam("ssid", true)->value();
-      if (request->hasParam("password", true)) pendingPassword = request->getParam("password", true)->value();
-      
-      triggerSaveConfig = true; 
-      request->send(200, "text/plain", "Configuration data accepted. Restarting...");
-      return;
-    }
-    request->redirect("/");
-  });
+    AsyncWebServerResponse *response = request->beginResponse(200, "text/html", redirectHtml);
+    response->addHeader("Connection", "close");
+    request->send(response);
+    return;
+  }
+  request->redirect("/");
+});
 
-  server.on("/run", HTTP_GET, [](AsyncWebServerRequest *request){
-    if (!isAuthorizedClient(request)) return;
-    if (currentState == MENU_SELECTION && isConfirmed) {
-      triggerRun = true; 
-    }
-    request->redirect("/");
-  });
+server.on("/reset", HTTP_GET, [](AsyncWebServerRequest *request){
+  triggerReset = true; 
+  String redirectHtml = "<!DOCTYPE html><html><head>"
+                        "<meta name='viewport' content='width=device-width, initial-scale=1.0'>"
+                        "<title>Restarting...</title>"
+                        "<style>body{font-family:Arial,sans-serif;text-align:center;padding-top:50px;background:#f7f9fa;}</style>"
+                        "<script>"
+                        "var seconds = 5;"
+                        "function countdown() {"
+                        "  document.getElementById('timer').innerText = seconds;"
+                        "  if (seconds <= 0) {"
+                        "    window.location.href = '/?nocache=' + new Date().getTime();" // Break Safari HTTP cache
+                        "  } else {"
+                        "    seconds--;"
+                        "    setTimeout(countdown, 1000);"
+                        "  }"
+                        "}"
+                        "window.onload = countdown;"
+                        "</script></head><body>"
+                        "<h2>Sourdough Controller Restarting...</h2>"
+                        "<p>Reconnecting in <span id='timer'>5</span> seconds...</p>"
+                        "</body></html>";
 
-  server.on("/pause", HTTP_GET, [](AsyncWebServerRequest *request){
-    if (!isAuthorizedClient(request)) return;
-    if (currentState != MENU_SELECTION && currentState != DONE && currentState != WIFI_CONFIG_AP) {
-      isPaused = !isPaused;
-      
-      if (isPaused) {
-        stepTimer = millis() - stepTimer; 
-        if (DebugLevel >= 1) {
-          Serial.println("[SYSTEM] Process status: Paused");
-        }
-      } else {
-        stepTimer = millis() - stepTimer;
-        previousMillis = millis(); 
-        if (DebugLevel >= 1) {
-          Serial.println("[SYSTEM] Process status: Running");
-        }
-      }
-    }
-    request->redirect("/");
-  });
-
-  server.on("/reset", HTTP_GET, [](AsyncWebServerRequest *request){
-    if (!isAuthorizedClient(request)) return;
-    triggerReset = true; 
-    request->send(200, "text/plain", "Device is restarting now...");
-  });
-
+  AsyncWebServerResponse *response = request->beginResponse(200, "text/html", redirectHtml);
+  response->addHeader("Connection", "close"); // Instruct Safari to immediately kill the TCP session
+  request->send(response);
+});
   server.begin();
 }
 
@@ -905,18 +938,13 @@ void moveToNextInstruction() {
   if (currentStepIdx >= instructionCount) {
     longPress(RunResetPin);
     currentState = DONE;
-    if (DebugLevel >= 1) {
-      Serial.println("Sourdough is done");
-    }
+    printLogHeader();
+    Serial.println("[SOURDOUGH] Process Complete: Bread is Done.");
     return;
   }
 
   ProfileInstruction inst = instructions[currentStepIdx];
   currentStepRemainingSec = inst.durationSec;
-
-  if (DebugLevel >= 1) {
-    Serial.printf("Starting Instruction %d: %s\n", currentStepIdx + 1, inst.functionName.c_str());
-  }
 }
 
 void loop() {
@@ -925,15 +953,6 @@ void loop() {
     if (currentState == MENU_SELECTION && isConfirmed) {
       saveSettingsToEEPROM();
       isPaused = false;
-
-      if (DebugLevel >= 1) {
-        Serial.println("==================================================");
-        Serial.println("[SOURDOUGH] Process Sequence Initiated.");
-        Serial.printf("[SOURDOUGH] Profile Name   : %s\n", breadName.c_str());
-        Serial.printf("[SOURDOUGH] Total Steps    : %d\n", instructionCount);
-        Serial.printf("[SOURDOUGH] Est Duration   : %s\n", getFormattedTimeHMS(calculateTotalDurationSec()).c_str());
-        Serial.println("==================================================");
-      }
       
       currentState = RUNNING_STEP;
       currentStepIdx = 0;
@@ -943,66 +962,71 @@ void loop() {
       previousMillis = millis();
       currentStepRemainingSec = instructions[0].durationSec;
 
+      printLogHeader();
+      Serial.println("[SOURDOUGH] Process Sequence Initiated.");
+      printLogHeader();
+      Serial.printf("[SOURDOUGH] Profile Name : %s\n", breadName.c_str());
+      printLogHeader();
+      Serial.printf("[SOURDOUGH] Total Steps  : %d\n", instructionCount);
+      printLogHeader();
+      Serial.printf("[SOURDOUGH] Total Duration: %s\n", getFormattedTimeHMS(calculateTotalDurationSec()).c_str());
+
       if (instructionCount == 0) {
         currentState = DONE;
       }
     }
   }
 
-  if (triggerReset) {
-    triggerReset = false;
+if (triggerReset) { 
+    triggerReset = false; 
+    printLogHeader();
+    Serial.println("[SYSTEM] Device Restart Requested. Waiting to flush network buffer...");
+    delay(2000); // Wait 2 seconds to ensure the browser receives the HTML page
     ESP.restart(); 
   }
 
-  if (triggerEraseAll) {
-    triggerEraseAll = false;
-    delay(500);
-    eraseAllEEPROM();
-    ESP.restart();
+  if (triggerEraseAll) { 
+    triggerEraseAll = false; 
+    printLogHeader();
+    Serial.println("[EEPROM] Erasing configuration and restarting...");
+    delay(2000); 
+    eraseAllEEPROM(); 
+    ESP.restart(); 
   }
-
-  if (triggerSwitchMode) {
-    triggerSwitchMode = false;
-    delay(500);
-    saveOpModeToEEPROM(targetSwitchMode);
-    ESP.restart();
+  
+  if (triggerSwitchMode) { 
+    triggerSwitchMode = false; 
+    printLogHeader();
+    Serial.printf("[SYSTEM] Switching Mode to %s and restarting...\n", getOpModeName(targetSwitchMode).c_str());
+    delay(2000); 
+    saveOpModeToEEPROM(targetSwitchMode); 
+    ESP.restart(); 
   }
-
-  if (triggerSaveConfig) {
-    triggerSaveConfig = false;
-    delay(500);
-    saveOpModeToEEPROM(pendingOpMode);
-    if (pendingOpMode == MODE_WIFI) {
-      saveWifiToEEPROM(pendingSsid, pendingPassword);
-    }
-    ESP.restart();
+  
+  if (triggerSaveConfig) { 
+    triggerSaveConfig = false; 
+    printLogHeader();
+    Serial.println("[SYSTEM] Saving new configuration parameters and restarting...");
+    delay(2000); 
+    saveOpModeToEEPROM(pendingOpMode); 
+    if (pendingOpMode == MODE_WIFI) saveWifiToEEPROM(pendingSsid, pendingPassword); 
+    ESP.restart(); 
   }
 
   if (currentState == WIFI_CONFIG_AP || currentState == MENU_SELECTION || currentState == DONE || isPaused) {
     return; 
   }
 
-  unsigned long currentInterval = 1000UL;
+  // --- Master 1-Second Tick ---
   unsigned long currentMillis = millis();
-  
-  if (currentMillis - previousMillis >= currentInterval) {
+  if (currentMillis - previousMillis >= 1000UL) {
     previousMillis = currentMillis;
     
     if (currentStepRemainingSec > 0 && instructions[currentStepIdx].type != TYPE_COLOUR && instructions[currentStepIdx].type != TYPE_DROP) {
       currentStepRemainingSec--;
-      if (currentStepRemainingSec < 0) currentStepRemainingSec = 0;
     }
     
     spinnerIdx = (spinnerIdx + 1) % 4;
-
-    if (DebugLevel >= 2) {
-      if (currentState != lastLoggedState || breadStateStep != lastLoggedStep || loopCounter != lastLoggedLoop) {
-        Serial.printf("[%s] State: %s | Step: %d | Loop: %d\n", getFormattedTimeHMS(calculateTotalRemainingSec()).c_str(), getStateName(currentState).c_str(), breadStateStep, loopCounter);
-        lastLoggedState = currentState;
-        lastLoggedStep = breadStateStep;
-        lastLoggedLoop = loopCounter;
-      }
-    }
   }
 
   // Dynamic Instruction Execution Router
@@ -1010,6 +1034,8 @@ void loop() {
 
   switch (inst.type) {
     case TYPE_COLOUR: {
+      printLogHeader();
+      Serial.printf("STARTING INSTRUCTION %d/%d -> Function: Colour | Option: %s\n", currentStepIdx + 1, instructionCount, (inst.colourOption == 0 ? "Light" : (inst.colourOption == 1 ? "Medium" : "Dark")));
       bakeColour = (BakeColourOption)inst.colourOption;
       executeBakeColourSequence();
       moveToNextInstruction();
@@ -1017,236 +1043,87 @@ void loop() {
     }
 
     case TYPE_DROP: {
+      printLogHeader();
+      Serial.printf("STARTING INSTRUCTION %d/%d -> Function: Drop\n", currentStepIdx + 1, instructionCount);
       shortPress(DropPin, 1);
       moveToNextInstruction();
       break;
     }
 
     case TYPE_KNEAD: {
-      int kneadMin = inst.durationSec / 60;
-      int cycleMin = 30;
-      int NoOfLoop = kneadMin / cycleMin;
-      int finalMin = kneadMin % cycleMin;
-
       if (!stepActive) {
-        if (breadStateStep == 0) {
-          if (loopCounter < NoOfLoop) {
-            longPress(RunResetPin);
-            shortPress(MenuPin, 7);     
-            shortPress(MinusPin, 10);   
-            shortPress(RunResetPin);
-            stepTimer = millis();
-            stepActive = true;
-          } else {
-            breadStateStep = 1; 
-          }
-        }
-        if (breadStateStep == 1) {
-          if (finalMin > 0) {
-            longPress(RunResetPin);
-            shortPress(MenuPin, 7);     
-            shortPress(MinusPin, 10);   
-            shortPress(RunResetPin);
-            stepTimer = millis();
-            stepActive = true;
-          } else {
-            breadStateStep = 2; 
-          }
-        }
-      } else { 
-        unsigned long targetDuration;
-        if (breadStateStep == 0) {
-          targetDuration = (cycleMin * 60000UL);
-          if (millis() - stepTimer >= targetDuration) {
-            stepActive = false;
-            loopCounter++;
-          }
-        } else if (breadStateStep == 1) {
-          targetDuration = (finalMin * 60000UL);
-          if (millis() - stepTimer >= targetDuration) {
-            stepActive = false;
-            breadStateStep = 2;
-          }
-        }
+        printLogHeader();
+        Serial.printf("STARTING INSTRUCTION %d/%d -> Function: %s | Duration: %s\n", currentStepIdx + 1, instructionCount, inst.functionName.c_str(), getFormattedTimeHMS(inst.durationSec).c_str());
+        shortPress(RunResetPin, 1);
+        longPress(RunResetPin);
+        shortPress(MenuPin, 7);     
+        shortPress(MinusPin, 10);   
+        shortPress(RunResetPin);
+        stepActive = true;
       }
-      if (breadStateStep == 2 || currentStepRemainingSec <= 0) {
+      if (currentStepRemainingSec <= 0) {
         moveToNextInstruction();
       }
       break;
     }
 
     case TYPE_DEGAS: {
-      int degasMin = inst.durationSec / 60;
-      int cycleMin = 30;
-      int NoOfLoop = degasMin / cycleMin;
-      int finalMin = degasMin % cycleMin;
-
       if (!stepActive) {
-        if (breadStateStep == 0) {
-          if (loopCounter < NoOfLoop) {
-            longPress(RunResetPin);
-            shortPress(MenuPin, 7);
-            shortPress(MinusPin, 9);
-            shortPress(RunResetPin);
-            stepTimer = millis();
-            stepActive = true;
-          } else {
-            breadStateStep = 1;
-          }
-        }
-        if (breadStateStep == 1) {
-          if (finalMin > 0) {
-            longPress(RunResetPin);
-            shortPress(MenuPin, 7);
-            shortPress(MinusPin, 9);
-            shortPress(RunResetPin);
-            stepTimer = millis();
-            stepActive = true;
-          } else {
-            breadStateStep = 2;
-          }
-        }
-      } else {
-        unsigned long targetDuration;
-        if (breadStateStep == 0) {
-          targetDuration = (cycleMin * 60000UL);
-          if (millis() - stepTimer >= targetDuration) {
-            stepActive = false;
-            loopCounter++;
-          }
-        } else if (breadStateStep == 1) {
-          targetDuration = (finalMin * 60000UL);
-          if (millis() - stepTimer >= targetDuration) {
-            stepActive = false;
-            breadStateStep = 2;
-          }
-        }
+        printLogHeader();
+        Serial.printf("STARTING INSTRUCTION %d/%d -> Function: %s | Duration: %s\n", currentStepIdx + 1, instructionCount, inst.functionName.c_str(), getFormattedTimeHMS(inst.durationSec).c_str());
+        shortPress(RunResetPin, 1);
+        longPress(RunResetPin);
+        shortPress(MenuPin, 7);
+        shortPress(MinusPin, 9);
+        shortPress(RunResetPin);
+        stepActive = true;
       }
-      if (breadStateStep == 2 || currentStepRemainingSec <= 0) {
+      if (currentStepRemainingSec <= 0) {
         moveToNextInstruction();
       }
       break;
     }
 
     case TYPE_PROOF: {
-      int ProofMin = inst.durationSec / 60;
-      int cycleMin = 60;
-      int NoOfLoop = ProofMin / cycleMin;
-      int finalMin = ProofMin % cycleMin;
-
       if (!stepActive) {
-        if (breadStateStep == 0) {
-          if (loopCounter < NoOfLoop) {
-            longPress(RunResetPin);
-            shortPress(MenuPin, 9);
-            shortPress(MinusPin, 10);
-            shortPress(RunResetPin);
-            stepTimer = millis();
-            stepActive = true;
-          } else {
-            breadStateStep = 1;
-          }
-        }
-        if (breadStateStep == 1) {
-          if (finalMin > 0) {
-            longPress(RunResetPin);
-            shortPress(MenuPin, 9);
-            shortPress(MinusPin, 10);
-            shortPress(RunResetPin);
-            stepTimer = millis();
-            stepActive = true;
-          } else {
-            breadStateStep = 2;
-          }
-        }
-      } else {
-        unsigned long targetDuration;
-        if (breadStateStep == 0) {
-          targetDuration = (cycleMin * 60000UL);
-          if (millis() - stepTimer >= targetDuration) {
-            stepActive = false;
-            loopCounter++;
-          }
-        } else if (breadStateStep == 1) {
-          targetDuration = (finalMin * 60000UL);
-          if (millis() - stepTimer >= targetDuration) {
-            stepActive = false;
-            breadStateStep = 2;
-          }
-        }
+        printLogHeader();
+        Serial.printf("STARTING INSTRUCTION %d/%d -> Function: %s | Duration: %s\n", currentStepIdx + 1, instructionCount, inst.functionName.c_str(), getFormattedTimeHMS(inst.durationSec).c_str());
+        longPress(RunResetPin);
+        shortPress(MenuPin, 9);
+        shortPress(MinusPin, 10);
+        shortPress(RunResetPin);
+        stepActive = true;
       }
-      if (breadStateStep == 2 || currentStepRemainingSec <= 0) {
+      if (currentStepRemainingSec <= 0) {
         moveToNextInstruction();
       }
       break;
     }
 
     case TYPE_REST: {
-      int finalMin = inst.durationSec / 60;
-
       if (!stepActive) {
-        longPress(RunResetPin);
-        stepTimer = millis();
+        printLogHeader();
+        Serial.printf("STARTING INSTRUCTION %d/%d -> Function: %s | Duration: %s\n", currentStepIdx + 1, instructionCount, inst.functionName.c_str(), getFormattedTimeHMS(inst.durationSec).c_str());
         stepActive = true;
-      } else {
-        unsigned long targetDuration = (finalMin * 60000UL);
-        if (millis() - stepTimer >= targetDuration || currentStepRemainingSec <= 0) {
-          moveToNextInstruction();
-        }
+      }
+      if (currentStepRemainingSec <= 0) {
+        moveToNextInstruction();
       }
       break;
     }
 
     case TYPE_BAKE: {
-      int bakeMin = inst.durationSec / 60;
-      int cycleMin = 60;
-      int NoOfLoop = bakeMin / cycleMin;
-      int finalMin = bakeMin % cycleMin;
-
       if (!stepActive) {
-        if (breadStateStep == 0) {
-          if (loopCounter < NoOfLoop) {
-            longPress(RunResetPin);
-            executeBakeColourSequence(); 
-            shortPress(MenuPin, 13);
-            shortPress(MinusPin, 10);
-            shortPress(RunResetPin);
-            stepTimer = millis();
-            stepActive = true;
-          } else {
-            breadStateStep = 1;
-          }
-        }
-        if (breadStateStep == 1) {
-          if (finalMin > 0) {
-            longPress(RunResetPin);
-            executeBakeColourSequence(); 
-            shortPress(MenuPin, 13);
-            shortPress(MinusPin, 10);
-            shortPress(RunResetPin);
-            stepTimer = millis();
-            stepActive = true;
-          } else {
-            breadStateStep = 2;
-          }
-        }
-      } else {
-        unsigned long targetDuration;
-        if (breadStateStep == 0) {
-          targetDuration = (cycleMin * 60000UL);
-          if (millis() - stepTimer >= targetDuration) {
-            stepActive = false;
-            loopCounter++;
-          }
-        } else if (breadStateStep == 1) {
-          targetDuration = (finalMin * 60000UL);
-          if (millis() - stepTimer >= targetDuration) {
-            stepActive = false;
-            breadStateStep = 2;
-          }
-        }
+        printLogHeader();
+        Serial.printf("STARTING INSTRUCTION %d/%d -> Function: %s | Duration: %s\n", currentStepIdx + 1, instructionCount, inst.functionName.c_str(), getFormattedTimeHMS(inst.durationSec).c_str());
+        longPress(RunResetPin);
+        executeBakeColourSequence(); 
+        shortPress(MenuPin, 13);
+        shortPress(MinusPin, 10);
+        shortPress(RunResetPin);
+        stepActive = true;
       }
-      if (breadStateStep == 2 || currentStepRemainingSec <= 0) {
+      if (currentStepRemainingSec <= 0) {
         moveToNextInstruction();
       }
       break;
