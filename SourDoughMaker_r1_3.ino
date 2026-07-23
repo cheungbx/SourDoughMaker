@@ -30,6 +30,18 @@ Pin 5 - Plus button Green
 Pin 6 - Weight button Blue
 Pin 7 - Menu button Purple
 Pin 8 - Colour button Grey
+
+ESP8266 pin layout
+
+RST                 TX
+A0                  RX
+16                  5 SCL
+14                  4 SDA
+12                  0
+13                  2
+15                  GND
+3.3V                VBUS
+
 */
 
 // --- Stable Pin Assignments ---
