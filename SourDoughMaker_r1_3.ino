@@ -32,7 +32,10 @@ Pin 7 - Menu button Purple
 Pin 8 - Colour button Grey
 
 Lolin Wemos D1 mini ESP8266 pin layout
+--------------------------
 Top View                            
+--------------------------
+
 RST                 TX
 A0                  RX
 16                  5 SCL
@@ -42,7 +45,10 @@ A0                  RX
 15                  GND
 3.3V                VBUS
       [USB-Port]
-Bottom View        
+--------------------------
+Bottom View       
+--------------------------
+
       [USB-Port]
 3.3V                VBUS                    
 15                  GND
@@ -52,6 +58,8 @@ Bottom View
 16                  5 SCL
 A0                  RX
 RST                 TX
+--------------------------
+
 */
 // --- Stable Pin Assignments ---
 const int RunResetPin = D1; // GPIO5
@@ -482,7 +490,7 @@ void loadSettingsFromEEPROM() {
       }
     }
   } else {
-    rawProfileInput = "Pain de Campagne (France)\nKnead 00:30:00\nDrop\nDegas 01:00:00\nProof 00:25:00\nRest 04:00:00\nColour Dark\nBake 01:30:00\n";
+    rawProfileInput = "Pain de Campagne (France)\nKnead 00:30:00\nDegas 01:00:00\nProof 00:25:00\nRest 04:00:00\nColour Dark\nBake 01:30:00\n";
     String outF, outE;
     parseAndValidateProfile(rawProfileInput, outF, outE);
     rawProfileInput = outF;
