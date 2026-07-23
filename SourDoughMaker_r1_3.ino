@@ -26,13 +26,13 @@ Pin 1 - ground Black
 Pin 2 - 5V Red
 Pin 3 - RunReset button Orange
 Pin 4 - Minus button Yellow
-Pin 5 - Plus button Green 
+Pin 5 - Drop pin Green 
 Pin 6 - Weight button Blue
 Pin 7 - Menu button Purple
 Pin 8 - Colour button Grey
 
 Lolin Wemos D1 mini ESP8266 pin layout
-
+Top View                            
 RST                 TX
 A0                  RX
 16                  5 SCL
@@ -42,9 +42,17 @@ A0                  RX
 15                  GND
 3.3V                VBUS
       [USB-Port]
-
+Bottom View        
+      [USB-Port]
+3.3V                VBUS                    
+15                  GND
+13                  2
+12                  0
+14                  4 SDA
+16                  5 SCL
+A0                  RX
+RST                 TX
 */
-
 // --- Stable Pin Assignments ---
 const int RunResetPin = D1; // GPIO5
 const int MinusPin    = D2; // GPIO4
@@ -231,9 +239,9 @@ void shortPress(int pin, int numberOfTimes) {
 
   for (int i = 0; i < numberOfTimes; i++) {
     digitalWrite(pin, LOW);
-    delay(200);
+    delay(150);
     digitalWrite(pin, HIGH);
-    delay(300);
+    delay(150);
   }
 }
 
@@ -245,9 +253,9 @@ void longPress(int pin) {
   }
 
   digitalWrite(pin, LOW);
-  delay(3000);
+  delay(2000);
   digitalWrite(pin, HIGH);
-  delay(1000);
+  delay(500);
 }
 
 void executeBakeColourSequence() {
@@ -275,18 +283,8 @@ void startInstructionSequence(InstructionType type) {
       shortPress(RunResetPin);
       break;
 
-    case TYPE_DEGAS:
-      shortPress(RunResetPin, 1);
-      longPress(RunResetPin);
-      shortPress(MenuPin, 7);    
-      shortPress(MinusPin, 9);  
-      shortPress(RunResetPin);
-      delay(5000);
-      longPress(RunResetPin);
-      break;
-
     case TYPE_PROOF:
-      shortPress(MenuPin, 7);    
+      shortPress(MenuPin, 9);    
       shortPress(MinusPin, 9);  
       shortPress(RunResetPin);
       break;
@@ -298,6 +296,7 @@ void startInstructionSequence(InstructionType type) {
       shortPress(RunResetPin);
       break;
 
+    case TYPE_DEGAS:
     default:
       break;
   }
@@ -312,6 +311,13 @@ void endInstructionSequence(InstructionType type) {
       break;
 
     case TYPE_DEGAS:
+      shortPress(RunResetPin, 1);
+      longPress(RunResetPin);
+      shortPress(MenuPin, 7);    
+      shortPress(MinusPin, 9);  
+      shortPress(RunResetPin);
+      delay(5000);
+      longPress(RunResetPin);
     default:
       break;
   }
