@@ -12,7 +12,7 @@ typedef uint16_t u16_t;
 typedef uint32_t u32_t;
 typedef int32_t s32_t;
 
-// 3. Temporarily silence unused parameter warnings inside third-party stack
+// 3. Temporarily silence unused parameter warnings inside the third-party stack
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wunused-parameter"
 #include <ESPAsyncTCP.h>
@@ -32,8 +32,8 @@ const int DebugLevel = 2;
 Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
 
 /*  
-DonLim DL-T065-K Bread Machine Pin Mapping
-Pin 1 - Ground Black 
+DonLim DL-T065-K Bread Machine
+Pin 1 - ground Black 
 Pin 2 - 5V Red
 Pin 3 - RunReset button Orange
 Pin 4 - Minus button Yellow
@@ -42,28 +42,38 @@ Pin 6 - Weight button Blue
 Pin 7 - Menu button Purple
 Pin 8 - Colour button Grey
 
-Lolin Wemos D1 mini ESP8266 Pin Allocation
-------------------------------------------
-D0 (GPIO16) -> DropPin - Bread machine currently do not support drop function, reserved for future.
-D1 (GPIO5)  -> RunResetPin
-D2 (GPIO4)  -> MinusPin
-D4 (GPIO2)  -> OLED I2C SDA
-D5 (GPIO14) -> OLED I2C SCL
-D6 (GPIO12) -> MenuPin
-D7 (GPIO13) -> ColourPin
+Lolin Wemos D1 mini ESP8266 pin layout
+--------------------------
+Top View                            
+--------------------------
 
-OLED SSD1306
--------------
-Uses the following default pins from the Adafruit display library
-GND  GND
-VCC  3.3V
-SCL  D5 (GPIO14).
-SDA  D4 (GPIO2) 
+RST                 TX
+A0                  RX
+16 DropPin          5 SCL
+14 SDA              4 SDA
+12 MenuPin          0
+13 ColourPin        2
+15                  GND
+3.3V                VBUS
+      [USB-Port]
+--------------------------
+Bottom View       
+--------------------------
+
+      [USB-Port]
+3.3V                VBUS                    
+15                  GND
+13 ColourPin        2
+12 MenuPin          0
+14 SDA              4 SDA
+16 DropPin          5 SCL
+A0                  RX
+RST                 TX
+--------------------------
 
 */
-
 // --- Stable Pin Assignments ---
-const int DropPin     = D0; // GPIO16 - Bread machine currently do not support drop function, reserved for future.
+const int DropPin     = D0; // GPIO16 - Reassigned to prevent bus collision with I2C SCL
 const int RunResetPin = D1; // GPIO5
 const int MinusPin    = D2; // GPIO4
 const int MenuPin     = D6; // GPIO12
@@ -125,7 +135,7 @@ bool stepActive = false;
 int loopCounter = 0; 
 long currentStepRemainingSec = 0;
 
-// Sub-step and Maximum Duration Tracking Variables
+// Sub-step and Maximum Duration Tracking Variables for Release 1.3
 long currentSubStepSec = 0; 
 
 // Spinning indicator
@@ -144,13 +154,13 @@ const int ADDR_PROFILE_TEXT = 110;
 const uint8_t VALID_CONFIG_MAGIC = 0xAA; 
 const uint8_t VALID_WIFI_MAGIC   = 0xBB;
 
-// --- Asynchronous Action Flags (Processed in loop context) ---
+// --- Asynchronous Web Event Action Flags ---
 volatile bool triggerRun = false;
 volatile bool triggerReset = false;
 volatile bool triggerEraseAll = false;
 volatile bool triggerSaveConfig = false;
 volatile bool triggerSwitchMode = false; 
-volatile bool triggerDisplayUpdate = false; // Safe I2C refresh flag
+volatile bool triggerDisplayUpdate = false; // Flag to request safe OLED rendering in loop context
 
 OpModeOption targetSwitchMode = MODE_WIFI;
 
@@ -203,6 +213,7 @@ long calculateTotalRemainingSec() {
   return remaining;
 }
 
+// Standard Header Printer
 void printLogHeader() {
   Serial.print("[");
   Serial.print(getFormattedTimeHMS(calculateTotalRemainingSec()));
@@ -327,13 +338,14 @@ void endInstructionSequence(InstructionType type) {
       shortPress(MenuPin, 7);    
       shortPress(MinusPin, 9);  
       shortPress(RunResetPin);
-      delay(10000); // turn paddle for 10 seconds during degas
+      delay(10000); // turn the paddle for 10 seconds to simulate the folding acction during degas
       longPress(RunResetPin);
     default:
       break;
   }
 }
 
+// Helper to determine max operational duration per cycle (in seconds)
 long getMaxPeriodForType(InstructionType type) {
   switch (type) {
     case TYPE_KNEAD: return 1680;
@@ -603,31 +615,35 @@ void sendHtmlResponse(AsyncWebServerRequest *request, const String &content) {
   request->send(response);
 }
 
-// --- OLED Interface Rendering Controller ---
+// --- OLED Display Renderer Controller ---
 void updateOLEDDisplay() {
   display.clearDisplay();
   display.setTextSize(1);
   display.setTextColor(SSD1306_WHITE);
   display.setCursor(0, 0);
 
-  // Line 1: Title and Release Version
-  display.printf("Billy Sourdough v%s\n", release_version);
+  // Line 1: Title and release version
+  display.printf("Billy Sourdough %s\n", release_version);
 
-  // Line 2: Horizontal Separator Line
-  display.drawLine(0, 9, 127, 9, SSD1306_WHITE);
+  // Line 2: Horizontal separator
+  display.drawLine(0, 10, 127, 9, SSD1306_WHITE);
 
-  // Lines 3 & 4: Network Mode, SSID, and IP Display
+  // Lines 3 & 4: Network Mode, SSID, and IP address
   display.setCursor(0, 16);
   if (operationMode == MODE_STANDALONE || currentState == WIFI_CONFIG_AP) {
-    display.printf("Standalone SSID:\n %s\n", apSsid.c_str());
+    display.printf("Standalone %s\n", apSsid.c_str());
+    display.setCursor(0, 26);
     display.println(WiFi.softAPIP().toString());
   } else {
-    display.printf("WIFI SSID:\n %s\n", clientSsid.c_str());
+    display.printf("WIFI %s\n", clientSsid.c_str());
+    display.setCursor(0, 26);
     display.println(WiFi.localIP().toString());
   }
 
-  // Line 5: Status Indicator with Dynamic Time Mapping
-  display.setCursor(0, 42);
+  // Line 5: One blank line space (Offset cursor to vertical offset 34)
+
+  // Line 6: Status and time tracking
+  display.setCursor(0, 38);
   String statusStr = "";
   long displayTimeSec = 0;
 
@@ -644,23 +660,21 @@ void updateOLEDDisplay() {
 
   display.printf("%s %s\n", statusStr.c_str(), getFormattedTimeHMS(displayTimeSec).c_str());
 
-  if (currentState == RUNNING_STEP) {
-    // Line 6: Instruction Step Indexing, Current Step Name, and Step Remaining Time
-    display.setCursor(0, 52);
-    if (instructionCount > 0 && currentStepIdx < instructionCount) {
-      ProfileInstruction currentInst = instructions[currentStepIdx];
-      
-      if (currentInst.type == TYPE_COLOUR) {
-        display.printf("%d/%d %s %s", currentStepIdx + 1, instructionCount, currentInst.functionName.c_str(),
-                      (currentInst.colourOption == 0 ? "Light" : (currentInst.colourOption == 1 ? "Medium" : "Dark")));
-      } else if (currentInst.type == TYPE_DROP) {
-        display.printf("%d/%d Drop", currentStepIdx + 1, instructionCount);
-      } else {
-        long remainingForStep = (currentState == RUNNING_STEP) ? currentStepRemainingSec : currentInst.durationSec;
-        display.printf("%d/%d %s %s", currentStepIdx + 1, instructionCount, currentInst.functionName.c_str(), getFormattedTimeHMS(remainingForStep).c_str());
-      }
+  // Line 7: Instruction breakdown during runtime execution
+  if (currentState == RUNNING_STEP && instructionCount > 0 && currentStepIdx < instructionCount) {
+    display.setCursor(0, 50);
+    ProfileInstruction currentInst = instructions[currentStepIdx];
+
+    if (currentInst.type == TYPE_COLOUR) {
+      display.printf("%d/%d %s %s", currentStepIdx + 1, instructionCount, currentInst.functionName.c_str(),
+                    (currentInst.colourOption == 0 ? "Light" : (currentInst.colourOption == 1 ? "Medium" : "Dark")));
+    } else if (currentInst.type == TYPE_DROP) {
+      display.printf("%d/%d Drop", currentStepIdx + 1, instructionCount);
+    } else {
+      display.printf("%d/%d %s %s", currentStepIdx + 1, instructionCount, currentInst.functionName.c_str(), getFormattedTimeHMS(currentStepRemainingSec).c_str());
     }
   }
+
   display.display();
 }
 
@@ -762,7 +776,7 @@ String generateHtml() {
 
       // 4. Separator 1 (Line 3)
       html += "<hr>";
-    }
+       }
   } 
   // State 2: RUNNING_STEP or DONE
   else {
@@ -839,7 +853,7 @@ void setup() {
   // Initialize Standard Hardware Wire I2C using SDA (D4 / GPIO2) and SCL (D5 / GPIO14)
   Wire.begin(D4, D5);
 
-  // Initialize SSD1306 Display
+  // Initialize SSD1306 Display immediately at start
   if (!display.begin(SSD1306_SWITCHCAPVCC, SCREEN_ADDRESS)) {
     Serial.println(F("[OLED] SSD1306 allocation failed"));
   } else {
@@ -863,6 +877,9 @@ void setup() {
   computeDynamicAPProperties();
   loadWifiFromEEPROM();
   OpModeOption storedMode = loadOpModeFromEEPROM();
+
+  // Render setup screen immediately at boot without waiting for Wi-Fi completion
+  updateOLEDDisplay();
 
   printLogHeader();
   Serial.printf("PROGRAM START -> Billy Sourdough Release %s\n", release_version);
@@ -898,7 +915,7 @@ void setup() {
     executeStandaloneAPProcess();
   }
 
-  // Draw initial OLED state on startup
+  // Refresh OLED after network interface setup completes to display the IP Address
   updateOLEDDisplay();
 
   // --- Web Routing Definitions ---
@@ -926,7 +943,7 @@ void setup() {
         }
       }
     }
-    triggerDisplayUpdate = true; // Signal main loop to refresh OLED safely
+    triggerDisplayUpdate = true;
     request->redirect("/");
   });
 
@@ -941,8 +958,16 @@ void setup() {
     if (currentState == MENU_SELECTION) {
       isConfirmed = false;
     }
-    triggerDisplayUpdate = true; // Signal main loop to refresh OLED safely
+    triggerDisplayUpdate = true;
     request->redirect("/");
+  });
+
+  server.on("/pause", HTTP_GET, [](AsyncWebServerRequest *request){
+    if (currentState == RUNNING_STEP) {
+      isPaused = !isPaused; 
+    }
+    triggerDisplayUpdate = true;
+    request->redirect("/");     
   });
 
   server.on("/update_step", HTTP_GET, [](AsyncWebServerRequest *request){
@@ -958,7 +983,7 @@ void setup() {
         }
       }
     }
-    triggerDisplayUpdate = true; // Signal main loop to refresh OLED safely
+    triggerDisplayUpdate = true;
     request->redirect("/");
   });
 
@@ -1113,6 +1138,7 @@ void setup() {
   server.begin();
 }
 
+// Helper to advance state machine step-by-step
 void moveToNextInstruction() {
   currentStepIdx++;
   breadStateStep = 0;
@@ -1134,7 +1160,7 @@ void moveToNextInstruction() {
 }
 
 void loop() {
-  // --- Deferred Display Update (Safely handled in main thread) ---
+  // Safe OLED Display Update inside the main loop context
   if (triggerDisplayUpdate) {
     triggerDisplayUpdate = false;
     updateOLEDDisplay();
@@ -1223,7 +1249,7 @@ void loop() {
     
     spinnerIdx = (spinnerIdx + 1) % 4;
 
-    // Trigger OLED refresh safely from main loop tick
+    // Trigger dynamic OLED refresh every second
     triggerDisplayUpdate = true;
   }
 
@@ -1289,3 +1315,4 @@ void loop() {
       break;
     }
   }
+}
