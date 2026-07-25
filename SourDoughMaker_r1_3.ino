@@ -852,7 +852,7 @@ void setup() {
     request->redirect("/");
   });
 
-server.on("/run", HTTP_ANY, [](AsyncWebServerRequest *request){
+  server.on("/run", HTTP_ANY, [](AsyncWebServerRequest *request){
     if (currentState == MENU_SELECTION && isConfirmed) {
       triggerRun = true; 
     }
@@ -864,6 +864,13 @@ server.on("/run", HTTP_ANY, [](AsyncWebServerRequest *request){
       isConfirmed = false;
     }
     request->redirect("/");
+  });
+
+  server.on("/pause", HTTP_GET, [](AsyncWebServerRequest *request){
+    if (currentState == RUNNING_STEP) {
+      isPaused = !isPaused; // Toggle pause/resume state
+    }
+    request->redirect("/");      // Redirect back to main page
   });
 
   server.on("/update_step", HTTP_GET, [](AsyncWebServerRequest *request){
