@@ -1021,7 +1021,9 @@ void setup() {
   else if (storedMode == MODE_WIFI) {
     operationMode = MODE_WIFI;
     printLogHeader();
-    Serial.printf("[WIFI] Target Router SSID: %s\n", clientSsid.c_str());
+     if (DebugLevel >= 1) {
+      Serial.printf("[WIFI] Target Router SSID: %s\n", clientSsid.c_str());
+     }
      if (DebugLevel >= 3) {
         Serial.printf("[WIFI] Password: %s\n", clientPassword.c_str());
      }
@@ -1032,7 +1034,13 @@ void setup() {
   else {
     currentState = WIFI_CONFIG_AP;
     printLogHeader();
-    Serial.printf("[WIFI] Provisioning Access Point Mode Active -> SSID: %s | Password: %s\n", apSsid.c_str(), defaultPassword);
+    if (DebugLevel >= 1) {
+      Serial.printf("[WIFI] Provisioning Access Point Mode Active -> SSID: %s\n", apSsid.c_str());
+    }
+    if (DebugLevel >= 3) {
+      Serial.printf("[WIFI] Password: %s\n", defaultPassword);
+    }
+
     executeStandaloneAPProcess();
   }
 
