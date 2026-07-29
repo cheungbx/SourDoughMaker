@@ -791,7 +791,7 @@ String generateWifiSetupHtml() {
   html += "input[type=text], input[type=password], select { width: 90%; padding: 10px; margin: 10px 0; font-size: 14px; }";
   html += "input[type=submit] { background-color: #4CAF50; color: white; padding: 12px; border: none; border-radius: 4px; cursor: pointer; width: 96%; font-size: 16px; }</style>";
   html += "</head><body><div class='card'>";
-  html += "2Billy Sourdough v" + String(release_version) + "</h2>";
+  html += "<h2>Billy Sourdough v" + String(release_version) + "</h2>";
   html += "<form action='/save_config' method='POST'>";
   
   html += "<label style='float:left; margin-left:5%; font-size:13px;'>Operation Mode:</label>";
