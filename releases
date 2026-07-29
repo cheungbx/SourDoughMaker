@@ -194,7 +194,7 @@ Starting sequence for Stop command::
 Ending sequence for Stop command:
 	  None.
 *2 In the Roasting state,  on the web page , move the restart button to the next line. Add a new line with the Stop button in between the line of Pause button and the line of Restart button. 
-When the stop button is pressed, display “confirm to Stop” button. If pressed, execute the stop sequence above,  abort the current Sourdough process, return to the menu input state.
+When the stop button is pressed, display “confirm to Stop” button. If pressed, execute the stop sequence above,  abort the current Sourdough process, return to the unconfirmed input state.
 
 
 
