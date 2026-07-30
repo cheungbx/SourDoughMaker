@@ -196,5 +196,12 @@ Ending sequence for Stop command:
 *2 In the Roasting state,  on the web page , move the restart button to the next line. Add a new line with the Stop button in between the line of Pause button and the line of Restart button. 
 When the stop button is pressed, display “confirm to Stop” button. If pressed, execute the stop sequence above,  abort the current Sourdough process, return to the unconfirmed input state.
 
+*Release 1.7
+Refer to the attached code. This is the ESP8266 Sourdough maker project. Do not include any ESP32 codes. Keep all previously defined log messages intact, do not try to streamline the code by removing any of the serial.print statements and debug messages. 
+Produce the fully updated source code, followed by an explanation of changes
+
+*1 When roasting started, do not lock the current instruction, allow the time of the current instruction to be edited. Then dynamically update the total remaining time and the remaining time of this instructions. this may also require changing the no. of cycles already culated for Knead, Degas, Proof and Bake function. Completed instructions continue to be locked. and do not allow editing.
+
+
 
 
