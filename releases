@@ -203,5 +203,21 @@ Produce the fully updated source code, followed by an explanation of changes
 *1 When roasting started, do not lock the current instruction, allow the time of the current instruction to be edited. Then dynamically update the total remaining time and the remaining time of this instructions. this may also require changing the no. of cycles already culated for Knead, Degas, Proof and Bake function. Completed instructions continue to be locked. and do not allow editing.
 
 
+*Release 1.8
+Refer to the attached code. This is the ESP8266 Sourdough maker project. Do not include any ESP32 codes. Keep all previously defined log messages intact, do not try to streamline the code by removing any of the serial.print statements and debug messages. 
+Produce the fully updated source code, followed by an explanation of changes
+
+*1 if the current state is running,  Rearrange the OLED display spacing to fit all the info below:
+“Billy Sourdough” followed by release and version
+Seperator
+current status (no subheading) followed by the total remaining time. e.g. “Running 09:22:30”
+
+The current instructions and the next 3 instructions to be executed, each on its own line, roll it up as each instruction is completed, with the following format.
+n/m aaaaa hh:mm:ss   e.g “1/6 Knead 00:30:00” 
+where 
+aaaaa is the command/function e.g.
+n is the current instruction number
+m is the total number of instructions.
+hh:mm:ss is the time from the current roasting instruction in hour minute second format.
 
 
