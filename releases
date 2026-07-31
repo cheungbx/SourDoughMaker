@@ -215,7 +215,7 @@ current status (no subheading) followed by the total remaining time. e.g. “Run
 The current instructions and the next 3 instructions to be executed, each on its own line, roll it up as each instruction is completed, with the following format.
 n/m aaaaa hh:mm:ss   e.g “1/6 Knead 00:30:00” 
 where 
-aaaaa is the command/function e.g.
+aaaaa is the command/function 
 n is the current instruction number
 m is the total number of instructions.
 hh:mm:ss is the time from the current roasting instruction in hour minute second format.
